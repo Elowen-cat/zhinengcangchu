@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.youshu.app.data.local.dao.ItemDao
 import com.youshu.app.data.local.entity.AiModelConfig
 import com.youshu.app.data.repository.AiModelRepository
+import com.youshu.app.data.warehouse.WarehouseRecognitionGateway
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,8 +16,11 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     itemDao: ItemDao,
-    private val aiModelRepository: AiModelRepository
+    private val aiModelRepository: AiModelRepository,
+    private val warehouseRecognitionGateway: WarehouseRecognitionGateway
 ) : ViewModel() {
+
+    val warehouseRecognitionConfigured get() = warehouseRecognitionGateway.isConfigured
 
     private val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000
 

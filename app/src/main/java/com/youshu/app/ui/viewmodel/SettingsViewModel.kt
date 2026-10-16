@@ -7,6 +7,7 @@ import com.youshu.app.data.backup.AppBackupManager
 import com.youshu.app.data.update.AppReleaseInfo
 import com.youshu.app.data.update.UpdateCheckResult
 import com.youshu.app.data.update.UpdateRepository
+import com.youshu.app.data.warehouse.WarehouseServiceConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,17 +18,46 @@ import javax.inject.Inject
 data class SettingsUiState(
     val isBusy: Boolean = false,
     val latestRelease: AppReleaseInfo? = null,
+    val recognitionServiceUrl: String = "",
+    val recognitionServiceConfigured: Boolean = false,
     val message: String? = null
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val backupManager: AppBackupManager,
-    private val updateRepository: UpdateRepository
+    private val updateRepository: UpdateRepository,
+    private val warehouseServiceConfig: WarehouseServiceConfig
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(SettingsUiState())
+    private val _state = MutableStateFlow(SettingsUiState(
+        recognitionServiceUrl = warehouseServiceConfig.read().baseUrl,
+        recognitionServiceConfigured = warehouseServiceConfig.read().isConfigured
+    ))
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
+
+    /** Returns a validation message; no credential is ever returned to the UI. */
+    fun saveRecognitionService(url: String, token: String): String? = runCatching {
+        warehouseServiceConfig.save(url, token)
+        val current = warehouseServiceConfig.read()
+        _state.value = _state.value.copy(
+            recognitionServiceUrl = current.baseUrl,
+            recognitionServiceConfigured = current.isConfigured,
+            message = "识别服务配置已保存"
+        )
+        null
+    }.getOrElse { it.message ?: "保存识别服务失败" }
+
+    fun clearRecognitionService(): String? = runCatching {
+        warehouseServiceConfig.clear()
+        val current = warehouseServiceConfig.read()
+        _state.value = _state.value.copy(
+            recognitionServiceUrl = current.baseUrl,
+            recognitionServiceConfigured = current.isConfigured,
+            message = "已恢复默认识别服务配置"
+        )
+        null
+    }.getOrElse { it.message ?: "移除识别服务失败" }
 
     fun exportBackup(targetUri: Uri) {
         viewModelScope.launch {

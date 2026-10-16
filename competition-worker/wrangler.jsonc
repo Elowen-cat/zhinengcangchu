@@ -1,0 +1,17 @@
+{
+  "name": "warehouse-recognition",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-16",
+  "ratelimits": [
+    {
+      "name": "DEMO_GLOBAL_LIMIT",
+      "namespace_id": "101701",
+      "simple": { "limit": 15, "period": 60 }
+    },
+    {
+      "name": "DEMO_CLIENT_LIMIT",
+      "namespace_id": "101702",
+      "simple": { "limit": 6, "period": 60 }
+    }
+  ]
+}

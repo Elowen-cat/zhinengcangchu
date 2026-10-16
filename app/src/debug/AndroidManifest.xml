@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="com.youshu.app.ui.warehouse.WarehouseUiPreviewActivity"
+            android:exported="true"
+            android:label="仓储界面预览" />
+    </application>
+</manifest>

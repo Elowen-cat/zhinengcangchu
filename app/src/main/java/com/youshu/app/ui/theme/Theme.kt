@@ -15,12 +15,16 @@ private val LightColorScheme = lightColorScheme(
     primary = PurpleStart,
     onPrimary = Color.White,
     primaryContainer = PurpleLight,
+    onPrimaryContainer = PurpleEnd,
     secondary = PurpleEnd,
+    secondaryContainer = PurpleLight,
+    onSecondaryContainer = PurpleEnd,
     background = BackgroundWarm,
     surface = CardWhite,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
     surfaceVariant = PurpleTint,
+    onSurfaceVariant = TextSecondary,
     outline = DividerSoft
 )
 

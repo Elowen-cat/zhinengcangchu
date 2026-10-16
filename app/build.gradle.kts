@@ -1,5 +1,10 @@
 import org.gradle.api.tasks.testing.Test
 
+val competitionDemoToken = providers.environmentVariable("WAREHOUSE_DEMO_ACCESS_TOKEN").orElse("").get()
+require(competitionDemoToken.isEmpty() || competitionDemoToken.matches(Regex("[0-9a-f]{32}"))) {
+    "WAREHOUSE_DEMO_ACCESS_TOKEN must be 32 lowercase hexadecimal characters"
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -38,10 +43,6 @@ afterEvaluate {
     }
 }
 
-fun String.toBuildConfigString(): String {
-    return "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
-}
-
 android {
     namespace = "com.youshu.app"
     compileSdk = 35
@@ -50,14 +51,11 @@ android {
         applicationId = "com.youshu.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 10
+        versionName = "1.8.1"
+        buildConfigField("String", "WAREHOUSE_DEMO_BASE_URL", "\"https://warehouse-recognition.dkwzt87gbz.workers.dev\"")
+        buildConfigField("String", "WAREHOUSE_DEMO_ACCESS_TOKEN", "\"$competitionDemoToken\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        val backendBaseUrl = providers.gradleProperty("youshu.backend.baseUrl")
-            .orElse(providers.environmentVariable("YOUSHU_BACKEND_BASE_URL"))
-            .getOrElse("https://replace-after-deploy.invalid")
-        buildConfigField("String", "YOUSHU_BACKEND_BASE_URL", backendBaseUrl.toBuildConfigString())
     }
 
     buildTypes {

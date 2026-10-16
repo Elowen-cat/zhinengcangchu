@@ -5,6 +5,7 @@ import com.youshu.app.data.local.dao.AiModelConfigDao
 import com.youshu.app.data.local.dao.CategoryDao
 import com.youshu.app.data.local.dao.ItemDao
 import com.youshu.app.data.local.dao.LocationDao
+import com.youshu.app.data.local.dao.WarehouseDao
 import com.youshu.app.data.local.database.AppDatabase
 import dagger.Module
 import dagger.Provides
@@ -35,4 +36,7 @@ object DatabaseModule {
     @Provides
     fun provideAiModelConfigDao(database: AppDatabase): AiModelConfigDao =
         database.aiModelConfigDao()
+
+    @Provides
+    fun provideWarehouseDao(database: AppDatabase): WarehouseDao = database.warehouseDao()
 }

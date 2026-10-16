@@ -7,6 +7,6 @@
     <bitmap
         android:antialias="true"
         android:filter="true"
-        android:gravity="center"
+        android:gravity="fill"
         android:src="@drawable/logo_mark_adaptive" />
 </inset>

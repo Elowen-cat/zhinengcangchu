@@ -1,598 +1,230 @@
 package com.youshu.app.ui.navigation
 
-import android.net.Uri
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import android.app.Activity
+import android.content.Intent
+
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import androidx.navigation.navArgument
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.youshu.app.ui.components.GlassPanel
-import com.youshu.app.ui.components.appGlassStyle
-import com.youshu.app.ui.screen.agent.AgentChatScreen
 import com.youshu.app.ui.screen.camera.CameraScreen
-import com.youshu.app.ui.screen.category.CategoryScreen
-import com.youshu.app.ui.screen.detail.DetailScreen
-import com.youshu.app.ui.screen.edit.EditScreen
-import com.youshu.app.ui.screen.expiry.ExpiryScreen
-import com.youshu.app.ui.screen.home.HomeScreen
 import com.youshu.app.ui.screen.profile.ProfileScreen
-import com.youshu.app.ui.screen.save.SavePhotoMode
-import com.youshu.app.ui.screen.save.SaveScreen
-import com.youshu.app.ui.screen.search.SearchScreen
 import com.youshu.app.ui.screen.settings.SettingsScreen
 import com.youshu.app.ui.screen.trash.TrashScreen
-import com.youshu.app.ui.theme.PurpleEnd
-import com.youshu.app.ui.theme.PurpleStart
-import com.youshu.app.ui.theme.TextHint
-import com.youshu.app.ui.viewmodel.LibraryStatusFilter
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
+import com.youshu.app.ui.warehouse.*
+import com.youshu.app.BuildConfig
 
-private data class BottomNavItem(
-    val route: String,
-    val label: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
-)
-
-private val bottomNavItems = listOf(
-    BottomNavItem(Screen.Home.route, "首页", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(Screen.Category.route, "分类", Icons.Filled.Category, Icons.Outlined.Category),
-    BottomNavItem(Screen.Search.route, "库房", Icons.Filled.Search, Icons.Outlined.Search),
-    BottomNavItem(Screen.Profile.route, "我的", Icons.Filled.Person, Icons.Outlined.Person)
-)
-
+// Kept for compiled legacy components while their data capabilities are being reused.
 internal const val EDIT_RESULT_IMAGE_URI = "edit_result_image_uri"
 internal const val EDIT_RESULT_IMAGE_URIS = "edit_result_image_uris"
 internal const val EDIT_RESULT_MODE = "edit_result_mode"
 internal const val SAVE_RESULT_IMAGE_URI = "save_result_image_uri"
 internal const val SAVE_RESULT_IMAGE_URIS = "save_result_image_uris"
 internal const val SAVE_RESULT_MODE = "save_result_mode"
+private const val WAREHOUSE_PHOTOS = "warehouse_photos"
+
+private data class WarehouseTab(val route: String, val label: String, val icon: ImageVector)
+private val tabs = listOf(
+    WarehouseTab(Screen.WarehouseWorkbench.route, "工作台", Icons.Default.Home),
+    WarehouseTab(Screen.WarehouseInventory.route, "库存", Icons.Default.Inventory2),
+    WarehouseTab(Screen.WarehouseAnalysis.route, "分析", Icons.Default.BarChart),
+    WarehouseTab(Screen.Profile.route, "我的", Icons.Default.Person)
+)
 
 @Composable
-fun AppNavGraph() {
+fun AppNavGraph(uiPreview: Boolean = false) {
     val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-    var cameraExitGuard by remember { mutableStateOf(false) }
-    var pendingCameraReturn by remember { mutableStateOf<CameraReturnTarget?>(null) }
-    val hazeState = remember { HazeState() }
-
-    val navigateToTopLevel: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) {
-                saveState = true
-            }
+    val context = LocalContext.current
+    val holder: WarehouseUiViewModel = hiltViewModel()
+    val state = holder.state
+    LaunchedEffect(uiPreview) { if (uiPreview) state.enablePreview() }
+    val backStack by navController.currentBackStackEntryAsState()
+    val route = backStack?.destination?.route
+    val showBar = route == Screen.WarehouseWorkbench.route || route == Screen.WarehouseInventory.route ||
+        route == Screen.WarehouseAnalysis.route || route == Screen.Profile.route
+    val selectedTab = when {
+        route == Screen.Profile.route -> Screen.Profile.route
+        route == Screen.WarehouseAnalysis.route -> Screen.WarehouseAnalysis.route
+        route == Screen.WarehouseWorkbench.route -> Screen.WarehouseWorkbench.route
+        else -> Screen.WarehouseInventory.route
+    }
+    val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val back: () -> Unit = { navController.popBackStack() }
+    fun openTopLevel(target: String) {
+        val concrete = if (target == Screen.WarehouseInventory.route) Screen.WarehouseInventory.createRoute() else target
+        navController.navigate(concrete) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
     }
-
-    val openCamera: (CameraReturnTarget) -> Unit = { target ->
-        pendingCameraReturn = target
-        navController.navigate(Screen.Camera.route)
-    }
-
-    fun navigateToNewSaveWithPhotos(
-        firstUri: String?,
-        imageUris: List<String>,
-        mode: SavePhotoMode = SavePhotoMode.APPEND
-    ) {
-        navController.navigate(Screen.Save.createRoute()) {
-            popUpTo(Screen.Camera.route) { inclusive = true }
-        }
-        navController.currentBackStackEntry?.savedStateHandle?.apply {
-            set(SAVE_RESULT_IMAGE_URI, firstUri)
-            set(SAVE_RESULT_IMAGE_URIS, imageUris)
-            set(SAVE_RESULT_MODE, mode.name.lowercase())
+    fun openInventory(filter: StockFilter) {
+        navController.navigate(Screen.WarehouseInventory.createRoute(filter.name)) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
         }
     }
-
-    LaunchedEffect(currentRoute) {
-        if (currentRoute == Screen.Camera.route) {
-            cameraExitGuard = true
-        }
+    fun openEntry(direction: EntryDirection, source: EntrySource, product: String? = null, batch: String? = null, draft: String? = null) {
+        navController.navigate(Screen.WarehouseEntry.createRoute(direction.name, source.name, product, batch, draft))
     }
-
-    val showBottomBar = currentRoute in listOf(
-        Screen.Home.route,
-        Screen.Category.route,
-        Screen.Search.route,
-        Screen.Profile.route
-    ) && !cameraExitGuard
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .hazeSource(hazeState)
-        ) {
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                composable(Screen.Home.route) {
-                    HomeScreen(
-                        onNavigateToDetail = { id -> navController.navigate(Screen.Detail.createRoute(id)) },
-                        onNavigateToEdit = { id -> navController.navigate(Screen.Edit.createRoute(id)) },
-                        onNavigateToLibrary = { navigateToTopLevel(Screen.Search.route) },
-                        onNavigateToAgent = { navController.navigate(Screen.AgentChat.route) },
-                        onNavigateToExpiry = { navController.navigate(Screen.Expiry.route) }
-                    )
-                }
-
-                composable(Screen.Camera.route) {
-                    CameraScreen(
-                        onBack = { navController.popBackStack() },
-                        onDisposed = { cameraExitGuard = false },
-                        onSkipPhoto = {
-                            when (val target = pendingCameraReturn) {
-                                CameraReturnTarget.NewSave,
-                                null -> {
-                                    navController.navigate(Screen.Save.createRoute()) {
-                                        popUpTo(Screen.Camera.route) { inclusive = true }
-                                    }
-                                }
-
-                                is CameraReturnTarget.SaveDraft -> {
-                                    navController.popBackStack()
-                                }
-
-                                is CameraReturnTarget.EditItem -> {
-                                    navController.previousBackStackEntry
-                                        ?.savedStateHandle
-                                        ?.set(EDIT_RESULT_MODE, target.mode.name.lowercase())
-                                    navController.popBackStack()
-                                }
-                            }
-                            pendingCameraReturn = null
-                        },
-                        onPhotoTaken = { uris ->
-                            val encoded = uris.map { it.toString() }
-                            val firstUri = encoded.firstOrNull()
-                            when (val target = pendingCameraReturn) {
-                                CameraReturnTarget.NewSave -> {
-                                    navigateToNewSaveWithPhotos(firstUri, encoded)
-                                }
-
-                                is CameraReturnTarget.EditItem -> {
-                                    navController.previousBackStackEntry?.savedStateHandle?.apply {
-                                        set(EDIT_RESULT_IMAGE_URI, firstUri)
-                                        set(EDIT_RESULT_IMAGE_URIS, encoded)
-                                        set(EDIT_RESULT_MODE, target.mode.name.lowercase())
-                                    }
-                                    navController.popBackStack()
-                                }
-
-                                is CameraReturnTarget.SaveDraft -> {
-                                    navController.previousBackStackEntry?.savedStateHandle?.apply {
-                                        set(SAVE_RESULT_IMAGE_URI, firstUri)
-                                        set(SAVE_RESULT_IMAGE_URIS, encoded)
-                                        set(SAVE_RESULT_MODE, target.mode.name.lowercase())
-                                    }
-                                    navController.popBackStack()
-                                }
-
-                                null -> {
-                                    navigateToNewSaveWithPhotos(firstUri, encoded)
-                                }
-                            }
-                            pendingCameraReturn = null
-                        }
-                    )
-                }
-
-                composable(Screen.SearchCenter.route) {
-                    SearchCenterScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenLibrary = { navigateToTopLevel(Screen.Search.route) },
-                        onNavigateToDetail = { id -> navController.navigate(Screen.Detail.createRoute(id)) }
-                    )
-                }
-
-                composable(Screen.AgentChat.route) {
-                    val homeEntry = remember(navController.currentBackStackEntry) {
-                        navController.getBackStackEntry(Screen.Home.route)
-                    }
-                    val agentViewModel: com.youshu.app.ui.viewmodel.AgentChatViewModel = hiltViewModel(homeEntry)
-                    AgentChatScreen(
-                        viewModel = agentViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-
-                composable(
-                    route = Screen.Save.route,
-                    arguments = listOf(
-                        navArgument("imageUri") {
-                            type = NavType.StringType
-                            defaultValue = ""
-                            nullable = true
-                        },
-                        navArgument("imageUris") {
-                            type = NavType.StringType
-                            defaultValue = ""
-                            nullable = true
-                        },
-                        navArgument("mode") {
-                            type = NavType.StringType
-                            defaultValue = SavePhotoMode.APPEND.name.lowercase()
-                        }
-                    )
-                ) { backStackEntry ->
-                    val encodedUri = backStackEntry.arguments?.getString("imageUri").orEmpty()
-                    val encodedUris = backStackEntry.arguments?.getString("imageUris").orEmpty()
-                    val mode = backStackEntry.arguments?.getString("mode").orEmpty()
-                    val resultImageUri by backStackEntry.savedStateHandle
-                        .getStateFlow<String?>(SAVE_RESULT_IMAGE_URI, null)
-                        .collectAsState()
-                    val resultImageUris by backStackEntry.savedStateHandle
-                        .getStateFlow(SAVE_RESULT_IMAGE_URIS, emptyList<String>())
-                        .collectAsState()
-                    val resultMode by backStackEntry.savedStateHandle
-                        .getStateFlow<String?>(SAVE_RESULT_MODE, null)
-                        .collectAsState()
-                    val uri = encodedUri.takeIf { it.isNotBlank() }?.let { Uri.parse(Uri.decode(it)) }
-                    val uris = encodedUris
-                        .split(",")
-                        .mapNotNull { value ->
-                            value.takeIf { it.isNotBlank() }?.let { Uri.parse(Uri.decode(it)) }
-                        }
-                    SaveScreen(
-                        imageUri = uri,
-                        pendingImageUris = uris,
-                        pendingPhotoMode = mode.toSavePhotoMode(),
-                        resultImageUri = resultImageUri?.let(Uri::parse),
-                        resultImageUris = resultImageUris.map(Uri::parse),
-                        resultPhotoMode = resultMode?.toSavePhotoMode(),
-                        onConsumePendingResult = {
-                            backStackEntry.savedStateHandle.remove<String>(SAVE_RESULT_IMAGE_URI)
-                            backStackEntry.savedStateHandle.remove<List<String>>(SAVE_RESULT_IMAGE_URIS)
-                            backStackEntry.savedStateHandle.remove<String>(SAVE_RESULT_MODE)
-                        },
-                        onBack = { navController.popBackStack() },
-                        onSaved = {
-                            navController.navigate(Screen.Home.route) {
-                                popUpTo(Screen.Home.route) { inclusive = true }
-                            }
-                        },
-                        onOpenCamera = { photoMode ->
-                            openCamera(CameraReturnTarget.SaveDraft(photoMode))
-                        }
-                    )
-                }
-
-                composable(
-                    route = Screen.Detail.route,
-                    arguments = listOf(
-                        navArgument("itemId") { type = NavType.LongType },
-                        navArgument("scope") { type = NavType.StringType }
-                    )
-                ) { backStackEntry ->
-                    val itemId = backStackEntry.arguments?.getLong("itemId") ?: return@composable
-                    val scope = backStackEntry.arguments?.getString("scope") ?: Screen.Detail.ScopeAll
-                    DetailScreen(
-                        itemId = itemId,
-                        scope = scope,
-                        onBack = { navController.popBackStack() },
-                        onEdit = { id -> navController.navigate(Screen.Edit.createRoute(id)) }
-                    )
-                }
-
-                composable(Screen.Search.route) {
-                    SearchScreen(
-                        onNavigateToDetail = { id, filter ->
-                            navController.navigate(Screen.Detail.createRoute(id, filter.toDetailScope()))
-                        },
-                        onNavigateToEdit = { id -> navController.navigate(Screen.Edit.createRoute(id)) }
-                    )
-                }
-
-                composable(Screen.Category.route) {
-                    CategoryScreen(
-                        onNavigateToDetail = { id -> navController.navigate(Screen.Detail.createRoute(id)) },
-                        onNavigateToEdit = { id -> navController.navigate(Screen.Edit.createRoute(id)) }
-                    )
-                }
-
-                composable(Screen.Expiry.route) {
-                    ExpiryScreen(
-                        onBack = { navController.popBackStack() },
-                        onNavigateToDetail = { id -> navController.navigate(Screen.Detail.createRoute(id)) }
-                    )
-                }
-
-                composable(
-                    route = Screen.Edit.route,
-                    arguments = listOf(
-                        navArgument("itemId") { type = NavType.LongType },
-                        navArgument("imageUri") {
-                            type = NavType.StringType
-                            defaultValue = ""
-                            nullable = true
-                        },
-                        navArgument("imageUris") {
-                            type = NavType.StringType
-                            defaultValue = ""
-                            nullable = true
-                        },
-                        navArgument("mode") {
-                            type = NavType.StringType
-                            defaultValue = SavePhotoMode.APPEND.name.lowercase()
-                        }
-                    )
-                ) { backStackEntry ->
-                    val itemId = backStackEntry.arguments?.getLong("itemId") ?: return@composable
-                    val encodedUri = backStackEntry.arguments?.getString("imageUri").orEmpty()
-                    val encodedUris = backStackEntry.arguments?.getString("imageUris").orEmpty()
-                    val mode = backStackEntry.arguments?.getString("mode").orEmpty()
-                    val resultImageUri by backStackEntry.savedStateHandle
-                        .getStateFlow<String?>(EDIT_RESULT_IMAGE_URI, null)
-                        .collectAsState()
-                    val resultImageUris by backStackEntry.savedStateHandle
-                        .getStateFlow(EDIT_RESULT_IMAGE_URIS, emptyList<String>())
-                        .collectAsState()
-                    val resultMode by backStackEntry.savedStateHandle
-                        .getStateFlow<String?>(EDIT_RESULT_MODE, null)
-                        .collectAsState()
-                    val uri = encodedUri.takeIf { it.isNotBlank() }?.let { Uri.parse(Uri.decode(it)) }
-                    val uris = encodedUris
-                        .split(",")
-                        .mapNotNull { value ->
-                            value.takeIf { it.isNotBlank() }?.let { Uri.parse(Uri.decode(it)) }
-                        }
-                    EditScreen(
-                        itemId = itemId,
-                        pendingImageUri = uri,
-                        pendingImageUris = uris,
-                        pendingPhotoMode = mode.toSavePhotoMode(),
-                        resultImageUri = resultImageUri?.let(Uri::parse),
-                        resultImageUris = resultImageUris.map(Uri::parse),
-                        resultPhotoMode = resultMode?.toSavePhotoMode(),
-                        onConsumePendingResult = {
-                            backStackEntry.savedStateHandle.remove<String>(EDIT_RESULT_IMAGE_URI)
-                            backStackEntry.savedStateHandle.remove<List<String>>(EDIT_RESULT_IMAGE_URIS)
-                            backStackEntry.savedStateHandle.remove<String>(EDIT_RESULT_MODE)
-                        },
-                        onBack = { navController.popBackStack() },
-                        onSaved = { navController.popBackStack() },
-                        onOpenCamera = { photoMode ->
-                            openCamera(CameraReturnTarget.EditItem(itemId, photoMode))
-                        }
-                    )
-                }
-
-                composable(Screen.Profile.route) {
-                    ProfileScreen(
-                        onOpenExpiry = { navController.navigate(Screen.Expiry.route) },
-                        onOpenTrash = { navController.navigate(Screen.Trash.route) },
-                        onOpenSettings = { navController.navigate(Screen.Settings.route) }
-                    )
-                }
-
-                composable(Screen.Trash.route) {
-                    TrashScreen(
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-
-                composable(Screen.Settings.route) {
-                    SettingsScreen(
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-            }
-        }
-
-        if (showBottomBar) {
-            YouShuBottomBar(
-                currentRoute = currentRoute,
-                onNavigate = navigateToTopLevel,
-                onCameraClick = { openCamera(CameraReturnTarget.NewSave) },
-                hazeState = hazeState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-    }
-}
-
-private fun LibraryStatusFilter.toDetailScope(): String {
-    return when (this) {
-        LibraryStatusFilter.ALL -> Screen.Detail.ScopeAll
-        LibraryStatusFilter.USED_UP -> Screen.Detail.ScopeUsedUp
-        LibraryStatusFilter.PENDING_REVIEW -> Screen.Detail.ScopePendingReview
-        LibraryStatusFilter.REVIEWED -> Screen.Detail.ScopeReviewed
-    }
-}
-
-private fun String.toSavePhotoMode(): SavePhotoMode {
-    return SavePhotoMode.APPEND
-}
-
-private sealed interface CameraReturnTarget {
-    data object NewSave : CameraReturnTarget
-    data class SaveDraft(val mode: SavePhotoMode) : CameraReturnTarget
-    data class EditItem(val itemId: Long, val mode: SavePhotoMode) : CameraReturnTarget
-}
-
-@Composable
-private fun YouShuBottomBar(
-    currentRoute: String?,
-    onNavigate: (String) -> Unit,
-    onCameraClick: () -> Unit,
-    hazeState: HazeState,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(98.dp),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        GlassPanel(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(72.dp),
-            hazeState = hazeState,
-            shape = RoundedCornerShape(26.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp),
-            containerColor = Color.White.copy(alpha = 0.16f),
-            borderColor = Color.White.copy(alpha = 0.72f),
-            shadowElevation = 20.dp,
-            blurAlpha = 0.6f
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                bottomNavItems.take(2).forEach { item ->
-                    BottomItem(
-                        item = item,
-                        selected = currentRoute == item.route,
-                        onClick = { onNavigate(item.route) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Box(modifier = Modifier.size(70.dp))
-                bottomNavItems.takeLast(2).forEach { item ->
-                    BottomItem(
-                        item = item,
-                        selected = currentRoute == item.route,
-                        onClick = { onNavigate(item.route) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 15.dp)
-                .size(width = 126.dp, height = 34.dp)
-                .clip(RoundedCornerShape(bottomStart = 30.dp, bottomEnd = 30.dp))
-                .background(Color.White.copy(alpha = 0f))
-        )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 4.dp)
-                .size(72.dp)
-                .clip(CircleShape)
-                .hazeEffect(
-                    state = hazeState,
-                    style = appGlassStyle(blurAlpha = 0.6f)
-                )
-                .background(Color.White.copy(alpha = 0.04f))
-                .border(width = 1.dp, color = Color.White.copy(alpha = 0.68f), shape = CircleShape)
-                .clickable(onClick = onCameraClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(58.dp)
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(PurpleStart, PurpleEnd)
+    Scaffold(
+        modifier = Modifier.imePadding(),
+        containerColor = WarehousePalette.Background,
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top),
+        bottomBar = {
+            if (showBar && !imeOpen) {
+                NavigationBar(containerColor = Color.White) {
+                    tabs.forEach { tab ->
+                        NavigationBarItem(
+                            selected = selectedTab == tab.route,
+                            onClick = { openTopLevel(tab.route) },
+                            icon = { Icon(tab.icon, contentDescription = null) },
+                            label = { Text(tab.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = WarehousePalette.Teal, selectedTextColor = WarehousePalette.Teal,
+                                indicatorColor = WarehousePalette.Mint, unselectedIconColor = WarehousePalette.Muted,
+                                unselectedTextColor = WarehousePalette.Muted
+                            )
                         )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CameraAlt,
-                    contentDescription = "拍照",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
+                    }
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun BottomItem(
-    item: BottomNavItem,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val color = if (selected) PurpleStart else TextHint
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-            contentDescription = item.label,
-            tint = color,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = item.label,
-            color = color,
-            fontSize = 10.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(top = 2.dp)
-        )
+    ) { padding ->
+        NavHost(navController, startDestination = Screen.WarehouseWorkbench.route, modifier = Modifier.fillMaxSize().padding(padding)) {
+            composable(Screen.WarehouseWorkbench.route) {
+                WarehouseWorkbenchScreen(
+                    onOpenInventory = { openInventory(it) },
+                    onReceive = { navController.navigate(Screen.WarehouseReceive.route) },
+                    onOutbound = { navController.navigate(Screen.WarehouseOutbound.route) },
+                    onCount = { navController.navigate(Screen.WarehouseCount.route) },
+                    onPending = { direction -> navController.navigate(Screen.WarehousePending.createRoute(direction.name)) },
+                    inboundDraftCount = state.drafts.count { it.direction == EntryDirection.INBOUND },
+                    outboundDraftCount = state.drafts.count { it.direction == EntryDirection.OUTBOUND },
+                    recentMovements = state.movements.toList(),
+                    previewMode = state.previewMode,
+                    onUiPreview = if (BuildConfig.DEBUG && !uiPreview) ({
+                        context.startActivity(Intent().setClassName(context.packageName, "com.youshu.app.ui.warehouse.WarehouseUiPreviewActivity"))
+                    }) else null,
+                    onExitPreview = if (uiPreview) ({ (context as? Activity)?.finish() }) else null,
+                    data = WorkbenchPreviewData(
+                        if (state.previewMode) "青禾便利店 · 后仓" else "本地仓库", state.products.count { it.isNear }.toString(),
+                        state.products.count { it.isLow }.toString(), state.drafts.count { it.direction == EntryDirection.INBOUND }.toString(),
+                        state.movements.count { it.direction == EntryDirection.OUTBOUND && it.time.toLocalDate() == java.time.LocalDate.now() }
+                            .toString() + " 笔",
+                        state.products.filter { it.isNear || it.isLow }.map {
+                            PreviewTask(it.name, if (it.isNear) "批次进入临期窗口" else "低于安全库存", if (it.isNear) "临期" else "低库存", true)
+                        }
+                    )
+                )
+            }
+            composable(Screen.WarehouseInventory.route, arguments = listOf(navArgument("filter") { defaultValue = "ALL" })) { entry ->
+                val filter = runCatching { StockFilter.valueOf(entry.arguments?.getString("filter").orEmpty()) }.getOrDefault(StockFilter.ALL)
+                WarehouseInventoryScreen(state, filter,
+                    onProduct = { navController.navigate(Screen.WarehouseProduct.createRoute(it)) },
+                    onReceive = { navController.navigate(Screen.WarehouseReceive.route) })
+            }
+            composable(Screen.WarehouseProduct.route, arguments = listOf(navArgument("productId") { type = NavType.StringType })) { entry ->
+                val id = entry.arguments?.getString("productId")
+                WarehouseProductDetailScreen(state.product(id), state.previewMode, state.movements.filter { it.productId == id }, back,
+                    onReceive = { openEntry(EntryDirection.INBOUND, EntrySource.MANUAL, id) },
+                    onOutbound = { batch -> openEntry(EntryDirection.OUTBOUND, EntrySource.MANUAL, id, batch) },
+                    onTransfer = { id?.let { navController.navigate(Screen.WarehouseTransfer.createRoute(it)) } })
+            }
+            listOf(Screen.WarehouseReceive to EntryDirection.INBOUND, Screen.WarehouseOutbound to EntryDirection.OUTBOUND).forEach { (screen, direction) ->
+                composable(screen.route) {
+                    WarehouseTransactionHomeScreen(direction, state, back,
+                        onSource = { openEntry(direction, it) },
+                        onPending = { navController.navigate(Screen.WarehousePending.createRoute(direction.name)) })
+                }
+            }
+            composable(Screen.WarehouseEntry.route, arguments = listOf(
+                navArgument("direction") { type = NavType.StringType }, navArgument("source") { type = NavType.StringType },
+                navArgument("product") { defaultValue = "" }, navArgument("batch") { defaultValue = "" }, navArgument("draft") { defaultValue = "" }
+            )) { entry ->
+                val direction = EntryDirection.valueOf(entry.arguments!!.getString("direction")!!)
+                val source = EntrySource.valueOf(entry.arguments!!.getString("source")!!)
+                val draftId = entry.arguments?.getString("draft")?.takeIf { it.isNotBlank() }
+                val existing = state.draft(draftId)
+                val photos by entry.savedStateHandle.getStateFlow(WAREHOUSE_PHOTOS, existing?.imageUris.orEmpty()).collectAsState()
+                WarehouseStockFormScreen(
+                    state, direction, source,
+                    entry.arguments?.getString("product")?.takeIf { it.isNotBlank() },
+                    entry.arguments?.getString("batch")?.takeIf { it.isNotBlank() }, draftId, photos, back,
+                    onCamera = { navController.navigate(Screen.Camera.route) },
+                    onSaveDraft = { draft, done -> holder.saveDraft(draft, done) },
+                    onSaved = {
+                        navController.navigate(Screen.WarehousePending.createRoute(direction.name)) {
+                            popUpTo(Screen.WarehouseEntry.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+            composable(Screen.WarehousePending.route, arguments = listOf(navArgument("direction") { type = NavType.StringType })) { entry ->
+                val direction = EntryDirection.valueOf(entry.arguments!!.getString("direction")!!)
+                WarehousePendingScreen(state, direction, back,
+                    onEdit = { id -> state.draft(id)?.let { openEntry(it.direction, it.source, it.productId, it.batchId, it.id) } },
+                    onReview = holder::reviewDraft,
+                    onDelete = holder::deleteDraft,
+                    onConfirm = holder::confirm,
+                    onContinue = { openEntry(direction, EntrySource.MANUAL) })
+            }
+            composable(Screen.WarehouseTransfer.route, arguments = listOf(navArgument("productId") { type = NavType.StringType })) { entry ->
+                WarehouseTransferScreen(state.product(entry.arguments?.getString("productId")), back, state.previewMode,
+                    onConfirm = holder::transferBatch)
+            }
+            composable(Screen.WarehouseCount.route) {
+                WarehouseCountScreen(state, back, onConfirm = holder::countBatch)
+            }
+            composable(Screen.Camera.route) {
+                CameraScreen(onBack = back, onSkipPhoto = back, onPhotoTaken = { uris ->
+                    navController.previousBackStackEntry?.savedStateHandle?.let { handle ->
+                        val old = handle.get<List<String>>(WAREHOUSE_PHOTOS).orEmpty()
+                        handle[WAREHOUSE_PHOTOS] = (old + uris.map { it.toString() }).distinct()
+                    }
+                    navController.popBackStack()
+                })
+            }
+            composable(Screen.WarehouseAnalysis.route) {
+                WarehouseAnalysisScreen(state, onProduct = {
+                    navController.navigate(Screen.WarehouseAnalysisProduct.createRoute(it))
+                })
+            }
+            composable(Screen.WarehouseAnalysisProduct.route, arguments = listOf(navArgument("productId") { type = NavType.StringType })) { entry ->
+                WarehouseAnalysisDetailScreen(
+                    product = state.product(entry.arguments?.getString("productId")),
+                    movements = state.movements.toList(), drafts = state.drafts.toList(),
+                    preview = state.previewMode, onBack = back,
+                    onSavePolicy = holder::updateReplenishmentPolicy
+                )
+            }
+            composable(Screen.Profile.route) {
+                ProfileScreen(
+                    onOpenExpiry = { openInventory(StockFilter.NEAR) },
+                    onOpenTrash = { navController.navigate(Screen.Trash.route) },
+                    onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                    sessionDraftCount = state.drafts.size,
+                    productCount = state.products.count { it.availableQuantity > 0 },
+                    expiringCount = state.products.count { it.isNear },
+                    previewMode = state.previewMode)
+            }
+            composable(Screen.Trash.route) { TrashScreen(onBack = back) }
+            composable(Screen.Settings.route) { SettingsScreen(onBack = back) }
+        }
     }
 }

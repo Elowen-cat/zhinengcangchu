@@ -1,23 +1,24 @@
 package com.youshu.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.youshu.app.ui.warehouse.WarehousePalette
 
-// 南大紫品牌色系
-val PurpleStart = Color(0xFF6A1B9A)
-val PurpleEnd = Color(0xFF9C27B0)
-val PurpleLight = Color(0xFFF3E5F5)
-val PurpleTint = Color(0xFFF8F0FF)
-val PurpleGlow = Color(0xFFCE93D8)
+// Compatibility names for shared settings/backup components; warehouse colors are authoritative.
+val PurpleStart = WarehousePalette.Teal
+val PurpleEnd = WarehousePalette.TealDark
+val PurpleLight = WarehousePalette.Mint
+val PurpleTint = WarehousePalette.Background
+val PurpleGlow = Color(0xFF8DD9CC)
 
-val Background = Color(0xFFF6F7FB)
-val BackgroundWarm = Color(0xFFF9F6FF)
+val Background = WarehousePalette.Background
+val BackgroundWarm = WarehousePalette.Background
 val CardWhite = Color(0xFFFFFFFF)
 val GlassWhite = Color(0xCCFFFFFF)
-val DividerSoft = Color(0xFFF0EDF7)
+val DividerSoft = WarehousePalette.Border
 
-val TextPrimary = Color(0xFF1F1F1F)
-val TextSecondary = Color(0xFF8C8CBC)
-val TextHint = Color(0xFFB8B6C8)
+val TextPrimary = WarehousePalette.Navy
+val TextSecondary = WarehousePalette.Muted
+val TextHint = Color(0xFF8191AD)
 
 val StatusExpired = Color(0xFFFF4D4F)
 val StatusNormal = Color(0xFF52C41A)

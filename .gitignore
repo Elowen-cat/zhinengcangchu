@@ -1,5 +1,6 @@
 *.iml
 .gradle
+/.kotlin/
 /local.properties
 /.idea
 .DS_Store
@@ -11,6 +12,7 @@ local.properties
 /app/build
 /app/release
 *.apk
+!/docs/smart-warehouse-*.apk
 *.ap_
 *.aab
 *.jks
@@ -35,3 +37,15 @@ UI草图.png
 /server/dist/
 /server/.env
 /server/*.zip
+
+# Competition recognition service credentials and local dependencies
+/competition-worker/node_modules/
+/competition-worker/.dev.vars
+/competition-worker/.env
+/competition-worker/.env.*
+/competition-worker/.demo-access-token
+/competition-worker/.demo-access-token.dpapi
+
+# Public download page packages are generated from the Android build.
+/download-site/public/*.apk
+/download-site/public/parts/

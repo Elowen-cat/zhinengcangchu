@@ -23,11 +23,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +70,10 @@ fun SettingsScreen(
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     var showMessageDialog by remember { mutableStateOf(false) }
+    var showServiceDialog by remember { mutableStateOf(false) }
+    var serviceUrl by remember { mutableStateOf("") }
+    var serviceToken by remember { mutableStateOf("") }
+    var serviceError by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/zip")
@@ -121,6 +129,39 @@ fun SettingsScreen(
                 shadowElevation = 12.dp
             ) {
                 Text(
+                    text = "仓储识别服务",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.size(6.dp))
+                Text(
+                    text = if (state.recognitionServiceConfigured)
+                        "已预设照片识别服务，拍照后可直接发起识别；这里也可以切换到你自己的服务。"
+                    else "照片识别需要服务地址和访问口令；DeepSeek API Key 只保存在服务端。",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.size(16.dp))
+                SettingsActionRow(
+                    icon = Icons.Default.CloudQueue,
+                    title = if (state.recognitionServiceConfigured) "识别服务已配置" else "配置识别服务",
+                    subtitle = state.recognitionServiceUrl.ifBlank { "尚未连接，仍可手动录入" },
+                    onClick = {
+                        serviceUrl = state.recognitionServiceUrl
+                        serviceToken = ""
+                        serviceError = null
+                        showServiceDialog = true
+                    }
+                )
+            }
+
+            AppSurfaceCard(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(24.dp),
+                shadowElevation = 12.dp
+            ) {
+                Text(
                     text = "数据备份",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
@@ -128,7 +169,7 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.size(6.dp))
                 Text(
-                    text = "导出时会打包分类、位置、物品和已保存图片；导入会覆盖当前本地数据。",
+                    text = "备份包含仓储商品、批次、单据、流水及原物品记录；导入新备份会覆盖当前本地数据。",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
@@ -217,6 +258,43 @@ fun SettingsScreen(
                     textAlign = TextAlign.Center
                 )
             }
+        }
+    }
+
+    if (showServiceDialog) {
+        AppDialog(
+            title = "配置仓储识别",
+            subtitle = "访问口令由你在新服务中单独设置；留空可保留已保存的口令。",
+            onDismissRequest = { showServiceDialog = false },
+            confirmText = "保存配置",
+            onConfirm = {
+                serviceError = viewModel.saveRecognitionService(serviceUrl, serviceToken)
+                if (serviceError == null) showServiceDialog = false
+            },
+            secondaryText = if (state.recognitionServiceConfigured) "恢复默认" else null,
+            onSecondary = {
+                serviceError = viewModel.clearRecognitionService()
+                if (serviceError == null) showServiceDialog = false
+            }
+        ) {
+            OutlinedTextField(
+                value = serviceUrl,
+                onValueChange = { serviceUrl = it; serviceError = null },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("HTTPS 服务地址") },
+                placeholder = { Text("https://example.workers.dev") }
+            )
+            OutlinedTextField(
+                value = serviceToken,
+                onValueChange = { serviceToken = it; serviceError = null },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(if (state.recognitionServiceConfigured) "新访问口令（留空则不更改）" else "访问口令") },
+                visualTransformation = PasswordVisualTransformation()
+            )
+            serviceError?.let { Text(it, color = Color(0xFFB74B35), fontSize = 12.sp) }
+            Text("配置只保存在这台设备，数据备份不会带走访问口令。", color = TextHint, fontSize = 12.sp)
         }
     }
 

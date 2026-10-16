@@ -10,14 +10,20 @@ import com.youshu.app.data.local.dao.AiModelConfigDao
 import com.youshu.app.data.local.dao.CategoryDao
 import com.youshu.app.data.local.dao.ItemDao
 import com.youshu.app.data.local.dao.LocationDao
+import com.youshu.app.data.local.dao.WarehouseDao
 import com.youshu.app.data.local.entity.AiModelConfig
 import com.youshu.app.data.local.entity.Category
 import com.youshu.app.data.local.entity.Item
 import com.youshu.app.data.local.entity.Location
+import com.youshu.app.data.local.entity.WarehouseBatchEntity
+import com.youshu.app.data.local.entity.WarehouseDocumentEntity
+import com.youshu.app.data.local.entity.WarehouseMovementEntity
+import com.youshu.app.data.local.entity.WarehouseProductEntity
 
 @Database(
-    entities = [Item::class, Category::class, Location::class, AiModelConfig::class],
-    version = 10,
+    entities = [Item::class, Category::class, Location::class, AiModelConfig::class,
+        WarehouseProductEntity::class, WarehouseBatchEntity::class, WarehouseDocumentEntity::class, WarehouseMovementEntity::class],
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun locationDao(): LocationDao
     abstract fun aiModelConfigDao(): AiModelConfigDao
+    abstract fun warehouseDao(): WarehouseDao
 
     companion object {
         @Volatile
@@ -105,6 +112,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `warehouse_products` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT NOT NULL, `unit` TEXT NOT NULL, `safetyStock` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_warehouse_products_name` ON `warehouse_products` (`name`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `warehouse_batches` (`id` TEXT NOT NULL, `productId` TEXT NOT NULL, `code` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `expiry` TEXT, `location` TEXT NOT NULL, `priority` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`productId`) REFERENCES `warehouse_products`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warehouse_batches_productId` ON `warehouse_batches` (`productId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_warehouse_batches_productId_code` ON `warehouse_batches` (`productId`, `code`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `warehouse_documents` (`id` TEXT NOT NULL, `status` TEXT NOT NULL, `direction` TEXT NOT NULL, `source` TEXT NOT NULL, `productId` TEXT, `productName` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `unit` TEXT NOT NULL, `batchId` TEXT, `batchCode` TEXT NOT NULL, `expiry` TEXT NOT NULL, `location` TEXT NOT NULL, `reason` TEXT NOT NULL, `destination` TEXT NOT NULL, `supplier` TEXT NOT NULL, `purchasePrice` TEXT NOT NULL, `imageUris` TEXT NOT NULL, `transcript` TEXT NOT NULL, `reviewed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `confirmedAt` INTEGER, PRIMARY KEY(`id`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warehouse_documents_status` ON `warehouse_documents` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warehouse_documents_direction` ON `warehouse_documents` (`direction`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `warehouse_movements` (`id` TEXT NOT NULL, `documentId` TEXT NOT NULL, `productId` TEXT NOT NULL, `productName` TEXT NOT NULL, `batchId` TEXT NOT NULL, `batchCode` TEXT NOT NULL, `direction` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `unit` TEXT NOT NULL, `note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`productId`) REFERENCES `warehouse_products`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT, FOREIGN KEY(`batchId`) REFERENCES `warehouse_batches`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT, FOREIGN KEY(`documentId`) REFERENCES `warehouse_documents`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warehouse_movements_productId` ON `warehouse_movements` (`productId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warehouse_movements_batchId` ON `warehouse_movements` (`batchId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_warehouse_movements_documentId` ON `warehouse_movements` (`documentId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_warehouse_movements_createdAt` ON `warehouse_movements` (`createdAt`)")
+            }
+        }
+
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE warehouse_products ADD COLUMN targetCoverageDays INTEGER NOT NULL DEFAULT 7")
+            }
+        }
+
         fun buildDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -121,7 +152,9 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_6_7,
                         MIGRATION_7_8,
                         MIGRATION_8_9,
-                        MIGRATION_9_10
+                        MIGRATION_9_10,
+                        MIGRATION_10_11,
+                        MIGRATION_11_12
                     )
                     .addCallback(PrepopulateCallback())
                     .build()

@@ -49,7 +49,8 @@ class BackendApiClient internal constructor(
     constructor(
         @ApplicationContext context: Context
     ) : this(
-        baseUrl = BuildConfig.YOUSHU_BACKEND_BASE_URL,
+        // The legacy proxy is retired for the warehouse app. Tests can still inject a URL.
+        baseUrl = "",
         appVersion = BuildConfig.VERSION_NAME,
         sessionStore = SharedPreferencesBackendSessionStore(context),
         httpClient = defaultHttpClient(),
@@ -304,8 +305,8 @@ class BackendApiClient internal constructor(
         require(path.startsWith('/') && !path.startsWith("//") && "://" !in path) {
             "Backend path must be relative"
         }
-        require(normalizedBaseUrl.startsWith("https://") || normalizedBaseUrl.startsWith("http://")) {
-            "Backend base URL is not configured"
+        check(normalizedBaseUrl.startsWith("https://") || normalizedBaseUrl.startsWith("http://")) {
+            "旧云函数已停用，当前版本不连接旧智能服务"
         }
     }
 

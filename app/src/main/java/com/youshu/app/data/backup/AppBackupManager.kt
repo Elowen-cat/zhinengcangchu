@@ -6,9 +6,15 @@ import android.net.Uri
 import com.youshu.app.data.local.entity.Category
 import com.youshu.app.data.local.entity.Item
 import com.youshu.app.data.local.entity.Location
+import com.youshu.app.data.local.entity.WarehouseBatchEntity
+import com.youshu.app.data.local.entity.WarehouseDocumentEntity
+import com.youshu.app.data.local.entity.WarehouseMovementEntity
+import com.youshu.app.data.local.entity.WarehouseProductEntity
 import com.youshu.app.data.repository.CategoryRepository
 import com.youshu.app.data.repository.ItemRepository
 import com.youshu.app.data.repository.LocationRepository
+import com.youshu.app.data.repository.WarehouseRepository
+import com.youshu.app.data.repository.WarehouseSnapshot
 import com.youshu.app.util.ImageUtil
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.Serializable
@@ -28,7 +34,8 @@ class AppBackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val itemRepository: ItemRepository,
     private val categoryRepository: CategoryRepository,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val warehouseRepository: WarehouseRepository
 ) {
 
     private val json = Json {
@@ -77,6 +84,19 @@ class AppBackupManager @Inject constructor(
         categoryRepository.replaceAll(backup.categories.map { it.toEntity() })
         locationRepository.replaceAll(backup.locations.map { it.toEntity() })
         itemRepository.replaceAll(importedItems)
+        backup.warehouse?.let { warehouse ->
+            val restored = warehouse.copy(documents = warehouse.documents.map { document ->
+                val images = document.imageUris.lineSequence().filter { it.isNotBlank() }.map { saved ->
+                    if (!saved.startsWith("warehouse_images/")) return@map saved
+                    val source = File(workingDir, saved)
+                    if (!source.exists()) return@map ""
+                    ImageUtil.copyImageInto(context, source.absolutePath, "warehouse_import_${UUID.randomUUID()}.jpg")
+                        ?.let { Uri.fromFile(File(it)).toString() }.orEmpty()
+                }.filter { it.isNotBlank() }.joinToString("\n")
+                document.copy(imageUris = images)
+            })
+            warehouseRepository.replaceFromBackup(restored.toSnapshot())
+        }
 
         workingDir.deleteRecursively()
     }
@@ -84,6 +104,18 @@ class AppBackupManager @Inject constructor(
     suspend fun createBackupZip(): File {
         val workingFile = File(context.cacheDir, "youshu-backup-${System.currentTimeMillis()}.zip")
         val imageEntries = mutableListOf<ImageEntry>()
+        val warehouse = warehouseRepository.exportSnapshot()
+        val warehouseDocuments = warehouse.documents.map { document ->
+            val entries = document.imageUris.lineSequence().filter { it.isNotBlank() }.mapIndexedNotNull { index, uriText ->
+                val path = Uri.parse(uriText).path ?: return@mapIndexedNotNull null
+                val file = File(path)
+                if (!file.exists()) return@mapIndexedNotNull null
+                val relativePath = "warehouse_images/${document.id}_${index}_${file.name}"
+                imageEntries += ImageEntry(relativePath, file)
+                relativePath
+            }.toList()
+            document.copy(imageUris = entries.joinToString("\n"))
+        }
         val backup = AppBackupPayload(
             exportedAt = System.currentTimeMillis(),
             categories = categoryRepository.getAllCategoriesSnapshot().map { CategorySnapshot.fromEntity(it) },
@@ -100,7 +132,8 @@ class AppBackupManager @Inject constructor(
                     }
                 }
                 ItemSnapshot.fromEntity(item, images)
-            }
+            },
+            warehouse = WarehouseBackupSnapshot.fromSnapshot(warehouse.copy(documents = warehouseDocuments))
         )
 
         ZipOutputStream(FileOutputStream(workingFile)).use { zip ->
@@ -119,9 +152,11 @@ class AppBackupManager @Inject constructor(
     }
 
     private fun unzip(zipFile: File, targetDir: File) {
+        val root = targetDir.canonicalFile
         ZipInputStream(zipFile.inputStream()).use { zip ->
             generateSequence { zip.nextEntry }.forEach { entry ->
-                val outFile = File(targetDir, entry.name)
+                val outFile = File(root, entry.name).canonicalFile
+                require(outFile.path.startsWith(root.path + File.separator)) { "备份包含无效文件路径" }
                 if (entry.isDirectory) {
                     outFile.mkdirs()
                 } else {
@@ -148,8 +183,25 @@ data class AppBackupPayload(
     val exportedAt: Long,
     val categories: List<CategorySnapshot>,
     val locations: List<LocationSnapshot>,
-    val items: List<ItemSnapshot>
+    val items: List<ItemSnapshot>,
+    val warehouse: WarehouseBackupSnapshot? = null
 )
+
+@Serializable
+data class WarehouseBackupSnapshot(
+    val products: List<WarehouseProductEntity>,
+    val batches: List<WarehouseBatchEntity>,
+    val documents: List<WarehouseDocumentEntity>,
+    val movements: List<WarehouseMovementEntity>
+) {
+    fun toSnapshot() = WarehouseSnapshot(products, batches, documents, movements)
+
+    companion object {
+        fun fromSnapshot(snapshot: WarehouseSnapshot) = WarehouseBackupSnapshot(
+            snapshot.products, snapshot.batches, snapshot.documents, snapshot.movements
+        )
+    }
+}
 
 @Serializable
 data class CategorySnapshot(

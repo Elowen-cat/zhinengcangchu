@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">东西不跑</string>
+    <string name="app_name">智能仓储</string>
     <string name="search_hint">搜索物品、位置，或说点什么…</string>
     <string name="quick_record">快速记录物品</string>
     <string name="quick_record_subtitle">拍一下，AI 帮你记住</string>

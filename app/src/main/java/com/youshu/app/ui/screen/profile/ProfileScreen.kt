@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,11 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -36,159 +38,138 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.youshu.app.ui.components.AppDecorativeBackground
+import com.youshu.app.BuildConfig
 import com.youshu.app.ui.components.AppDialog
-import com.youshu.app.ui.components.AppSurfaceCard
-import com.youshu.app.ui.theme.PurpleEnd
-import com.youshu.app.ui.theme.PurpleStart
-import com.youshu.app.ui.theme.StatusExpired
-import com.youshu.app.ui.theme.TextHint
-import com.youshu.app.ui.theme.TextPrimary
 import com.youshu.app.ui.theme.TextSecondary
 import com.youshu.app.ui.viewmodel.ProfileViewModel
-import com.youshu.app.util.DateUtil
+import com.youshu.app.ui.warehouse.WarehousePalette
 
 @Composable
 fun ProfileScreen(
     onOpenExpiry: () -> Unit,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
+    sessionDraftCount: Int = 0,
+    productCount: Int = 0,
+    expiringCount: Int = 0,
+    previewMode: Boolean = false,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
-    val totalCount by viewModel.totalCount.collectAsState()
-    val expiringCount by viewModel.expiringCount.collectAsState()
-    val totalValue by viewModel.totalValue.collectAsState()
     val trashCount by viewModel.trashCount.collectAsState()
-    val models by viewModel.aiModels.collectAsState()
-
-    var showModelDialog by remember { mutableStateOf(false) }
     var infoDialogTitle by remember { mutableStateOf<String?>(null) }
     var infoDialogMessage by remember { mutableStateOf<String?>(null) }
+    var showModelDialog by remember { mutableStateOf(false) }
 
-    Box {
-        AppDecorativeBackground()
-
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(WarehousePalette.Background)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
+            .padding(top = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
             modifier = Modifier
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 88.dp)
+                .fillMaxWidth()
+                .clickable {
+                    infoDialogTitle = "本地仓库"
+                    infoDialogMessage = if (previewMode) "这是只用于界面演示的样例仓库。" else "仓储数据保存在当前设备；可通过设置中的数据备份导出。"
+                },
+            shape = RoundedCornerShape(26.dp),
+            color = WarehousePalette.Mint,
+            shadowElevation = 1.dp
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(PurpleStart, PurpleEnd)
-                        )
-                    )
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 22.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(148.dp)
-                        .align(Alignment.TopEnd)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color.White.copy(alpha = 0.24f), Color.Transparent)
-                            ),
-                            shape = CircleShape
-                        )
-                )
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.22f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "东",
-                                color = Color.White,
-                                fontSize = 21.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.size(12.dp))
-                        Column {
-                            Text(
-                                text = "东西不跑用户",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "记录生活中的每一件物品",
-                                fontSize = 12.sp,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            AppSurfaceCard(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                shape = RoundedCornerShape(24.dp),
-                shadowElevation = 12.dp,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 14.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .size(58.dp)
+                        .clip(CircleShape)
+                        .background(WarehousePalette.Teal),
+                    contentAlignment = Alignment.Center
                 ) {
-                    CompactStat(label = "物品总数", value = totalCount.toString())
-                    CompactStat(label = "即将过期", value = expiringCount.toString(), color = StatusExpired)
-                    CompactStat(label = "物品价值", value = DateUtil.formatCurrency(totalValue))
+                    Text("东", color = androidx.compose.ui.graphics.Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
+                Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                    Text(if (previewMode) "本地仓库 · 界面预览" else "本地仓库", color = WarehousePalette.Navy, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Text("单仓模式 · 当前设备", color = WarehousePalette.Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+                Icon(Icons.Default.ChevronRight, contentDescription = "仓库信息", tint = WarehousePalette.Muted)
             }
+        }
 
-            AppSurfaceCard(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                shape = RoundedCornerShape(24.dp),
-                shadowElevation = 12.dp
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = androidx.compose.ui.graphics.Color.White,
+            shadowElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                MenuRow(
+                ProfileMetric(productCount.toString(), "在库商品", Modifier.weight(1f))
+                MetricDivider()
+                ProfileMetric(sessionDraftCount.toString(), "待确认草稿", Modifier.weight(1f))
+                MetricDivider()
+                ProfileMetric(expiringCount.toString(), "即将到期", Modifier.weight(1f))
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            color = androidx.compose.ui.graphics.Color.White,
+            shadowElevation = 2.dp
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                ProfileMenuRow(
                     icon = Icons.Default.AutoAwesome,
-                    title = "AI 服务状态",
-                    subtitle = "DeepSeek、千问和高德服务由云端安全管理",
+                    title = "智能服务状态",
+                    subtitle = if (viewModel.warehouseRecognitionConfigured) "仓储识别服务已配置" else "仓储识别 API 待配置 · 可手动录入",
                     onClick = { showModelDialog = true }
                 )
-                DividerSpacer()
-                MenuRow(
+                ProfileDivider()
+                ProfileMenuRow(
+                    icon = Icons.Default.Groups,
+                    title = "成员与权限",
+                    subtitle = "当前为本机单仓，暂不支持云端成员权限",
+                    onClick = {
+                        infoDialogTitle = "成员与权限"
+                        infoDialogMessage = "当前版本使用本地单仓数据，还没有跨设备成员与权限管理。"
+                    }
+                )
+                ProfileDivider()
+                ProfileMenuRow(
                     icon = Icons.Default.Notifications,
                     title = "到期提醒",
-                    subtitle = "查看即将到期的物品与提醒状态",
+                    subtitle = "查看即将到期的库存批次",
                     onClick = onOpenExpiry
                 )
-                DividerSpacer()
-                MenuRow(
+                ProfileDivider()
+                ProfileMenuRow(
                     icon = Icons.Default.History,
-                    title = "回收站",
-                    subtitle = if (trashCount > 0) "当前有 $trashCount 项可在 30 天内恢复" else "30 天内可恢复最近删除的物品",
+                    title = "旧记录回收站",
+                    subtitle = if (trashCount > 0) "原物品记录有 $trashCount 项可恢复" else "管理原物品数据的删除记录",
                     onClick = onOpenTrash
                 )
-                DividerSpacer()
-                MenuRow(
+                ProfileDivider()
+                ProfileMenuRow(
                     icon = Icons.Default.Settings,
                     title = "设置",
-                    subtitle = "备份数据、检查更新与偏好设置",
+                    subtitle = "仓库、提醒与数据备份",
                     onClick = onOpenSettings
                 )
-                DividerSpacer()
-                MenuRow(
+                ProfileDivider()
+                ProfileMenuRow(
                     icon = Icons.AutoMirrored.Filled.Help,
                     title = "帮助与反馈",
                     subtitle = "常见问题与功能建议",
@@ -197,174 +178,96 @@ fun ProfileScreen(
                         infoDialogMessage = "后续会补充常见问题、使用说明和反馈渠道。"
                     }
                 )
-                DividerSpacer()
-                MenuRow(
+                ProfileDivider()
+                ProfileMenuRow(
                     icon = Icons.Default.Info,
                     title = "关于我们",
-                    subtitle = "版本 1.1.0",
+                    subtitle = "版本 ${BuildConfig.VERSION_NAME}",
                     onClick = {
                         infoDialogTitle = "关于我们"
-                        infoDialogMessage = "东西不跑：拍一下、存一下，东西永远不跑。\n开源地址：https://github.com/LZY426915/don-tRun"
+                        infoDialogMessage = "仓储演示空间基于现有开源应用逐步改造。\n版本 ${BuildConfig.VERSION_NAME}"
                     }
                 )
             }
-
-            Text(
-                text = "东西不跑，永远不丢",
-                fontSize = 12.sp,
-                color = TextSecondary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 20.dp),
-                textAlign = TextAlign.Center
-            )
         }
+
+        Text(
+            text = "本地数据保存在当前设备",
+            fontSize = 12.sp,
+            color = TextSecondary,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            textAlign = TextAlign.Center
+        )
     }
 
     if (showModelDialog) {
         AppDialog(
-            title = "AI 服务状态",
-            subtitle = "访问凭证保存在云端，应用和安装包中不包含 API Key。",
+            title = "智能服务状态",
+            subtitle = if (viewModel.warehouseRecognitionConfigured) "仓储识别服务已配置。" else "仓储识别 API 尚未配置。",
             onDismissRequest = { showModelDialog = false },
             confirmText = "关闭",
             onConfirm = { showModelDialog = false }
         ) {
-            if (models.isEmpty()) {
-                Text(
-                    text = "服务配置正在初始化。",
-                    fontSize = 14.sp,
-                    color = TextHint
-                )
-            } else {
-                models.forEach { model ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = model.alias,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = model.provider,
-                                fontSize = 12.sp,
-                                color = TextHint
-                            )
-                            Text(
-                                text = "云端安全托管 · 已启用",
-                                fontSize = 12.sp,
-                                color = TextSecondary,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            Text(
+                if (viewModel.warehouseRecognitionConfigured) "拍照和语音建议仅用于填写草稿，确认前仍需人工核对。"
+                else "当前可手动入库、出库和核对草稿；照片保留作核对依据，语音使用设备提供的识别服务。旧云函数已停用。",
+                fontSize = 14.sp,
+                color = TextSecondary
+            )
         }
     }
 
     if (infoDialogTitle != null && infoDialogMessage != null) {
         AppDialog(
             title = infoDialogTitle!!,
-            onDismissRequest = {
-                infoDialogTitle = null
-                infoDialogMessage = null
-            },
+            onDismissRequest = { infoDialogTitle = null; infoDialogMessage = null },
             confirmText = "知道了",
-            onConfirm = {
-                infoDialogTitle = null
-                infoDialogMessage = null
-            }
+            onConfirm = { infoDialogTitle = null; infoDialogMessage = null }
         ) {
-            Text(
-                text = infoDialogMessage!!,
-                color = TextSecondary,
-                fontSize = 14.sp
-            )
+            Text(infoDialogMessage!!, color = TextSecondary, fontSize = 14.sp)
         }
-    }
-}
-@Composable
-private fun CompactStat(
-    label: String,
-    value: String,
-    color: Color = PurpleStart
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = TextSecondary
-        )
     }
 }
 
 @Composable
-private fun MenuRow(
-    icon: ImageVector,
+private fun ProfileMetric(value: String, label: String, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = WarehousePalette.Teal)
+        Text(label, fontSize = 12.sp, color = WarehousePalette.Muted, modifier = Modifier.padding(top = 3.dp))
+    }
+}
+
+@Composable
+private fun MetricDivider() {
+    Spacer(Modifier.width(1.dp).height(38.dp).background(WarehousePalette.Border))
+}
+
+@Composable
+private fun ProfileMenuRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(PurpleStart.copy(alpha = 0.12f)),
+            modifier = Modifier.size(44.dp).clip(CircleShape).background(WarehousePalette.Mint),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = PurpleStart,
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(icon, contentDescription = null, tint = WarehousePalette.Teal, modifier = Modifier.size(22.dp))
         }
-        Spacer(modifier = Modifier.size(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Text(
-                text = subtitle,
-                fontSize = 12.sp,
-                color = TextHint
-            )
+        Column(Modifier.weight(1f).padding(start = 12.dp, end = 8.dp)) {
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = WarehousePalette.Navy)
+            Text(subtitle, fontSize = 12.sp, color = WarehousePalette.Muted, modifier = Modifier.padding(top = 3.dp))
         }
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = TextHint
-        )
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = WarehousePalette.Muted)
     }
 }
 
 @Composable
-private fun DividerSpacer() {
-    Spacer(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .background(Color(0xFFF1EEF7))
-            .height(1.dp)
-    )
+private fun ProfileDivider() {
+    Spacer(Modifier.fillMaxWidth().height(1.dp).background(WarehousePalette.Border))
 }

@@ -50,7 +50,7 @@
 
 **Files:** `app/build.gradle.kts`, `README.md`, `tencent-scf/README.md`
 
-- [ ] Build the next APK only after the Tencent Function URL and ASR are reachable on the target phone.
+- [x] Build a local 1.8.2 preview APK with the Tencent Function URL and demo token; do not publish it before phone checks.
 - [ ] Keep service setup in owner settings; ordinary users receive a preconfigured build.
 - [ ] Update the public download only after real-device verification.
 

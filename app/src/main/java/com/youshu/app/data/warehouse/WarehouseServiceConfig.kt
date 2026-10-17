@@ -22,6 +22,7 @@ import javax.inject.Singleton
 class WarehouseServiceConfig @Inject constructor(@ApplicationContext context: Context) {
     private val file = File(context.noBackupFilesDir, "warehouse_service_config.json")
     private val alias = "warehouse_service_access_v1"
+    private val retiredWorkerUrl = "https://warehouse-recognition.dkwzt87gbz.workers.dev"
 
     data class Snapshot(val baseUrl: String, val accessToken: String) {
         val isConfigured: Boolean get() = baseUrl.isNotBlank() && accessToken.isNotBlank()
@@ -38,6 +39,9 @@ class WarehouseServiceConfig @Inject constructor(@ApplicationContext context: Co
         return runCatching {
             val json = JSONObject(file.readText())
             val url = json.optString("url")
+            if (url.trimEnd('/') == retiredWorkerUrl &&
+                BuildConfig.WAREHOUSE_DEMO_ACCESS_TOKEN.isNotBlank()
+            ) return demoSnapshot()
             val iv = Base64.decode(json.getString("iv"), Base64.NO_WRAP)
             val cipherText = Base64.decode(json.getString("token"), Base64.NO_WRAP)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -52,7 +56,7 @@ class WarehouseServiceConfig @Inject constructor(@ApplicationContext context: Co
         val uri = runCatching { URI(normalized) }.getOrNull()
         require(uri != null && uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null &&
             uri.query == null && uri.fragment == null && uri.port == -1 && uri.path.orEmpty().isBlank()) {
-            "服务地址须是 HTTPS 根地址，例如 https://example.workers.dev"
+            "服务地址须是 HTTPS 根地址，例如 https://example.com"
         }
         val token = newToken.trim().ifBlank { read().accessToken }
         require(token.length >= 16 && token.length <= 256) { "访问口令长度须为 16–256 个字符" }

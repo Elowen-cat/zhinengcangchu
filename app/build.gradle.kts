@@ -6,7 +6,7 @@ require(competitionDemoToken.isEmpty() || competitionDemoToken.matches(Regex("[0
     "WAREHOUSE_DEMO_ACCESS_TOKEN must be 32 lowercase hexadecimal characters"
 }
 val competitionDemoBaseUrl = providers.environmentVariable("WAREHOUSE_DEMO_BASE_URL")
-    .orElse("https://warehouse-recognition.dkwzt87gbz.workers.dev").get().trim().trimEnd('/')
+    .orElse("https://1509339681-dwhhcp4gwl.ap-guangzhou.tencentscf.com").get().trim().trimEnd('/')
 val competitionDemoUri = runCatching { URI(competitionDemoBaseUrl) }.getOrNull()
 require(competitionDemoUri?.scheme == "https" && !competitionDemoUri?.host.isNullOrBlank() &&
     competitionDemoUri?.port == -1 && competitionDemoUri?.userInfo == null &&
@@ -61,8 +61,8 @@ android {
         applicationId = "com.youshu.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.8.1"
+        versionCode = 11
+        versionName = "1.8.2"
         buildConfigField("String", "WAREHOUSE_DEMO_BASE_URL", "\"$competitionDemoBaseUrl\"")
         buildConfigField("String", "WAREHOUSE_DEMO_ACCESS_TOKEN", "\"$competitionDemoToken\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

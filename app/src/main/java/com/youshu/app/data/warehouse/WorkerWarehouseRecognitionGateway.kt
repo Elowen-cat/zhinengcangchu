@@ -16,6 +16,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,28 +59,34 @@ class WorkerWarehouseRecognitionGateway @Inject constructor(
         val request = Request.Builder().url(settings.baseUrl + path)
             .header("X-Warehouse-Access-Token", settings.accessToken)
             .post(body).build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                val message = when (response.code) {
-                    401, 403 -> "识别服务拒绝访问，请检查访问口令"
-                    402 -> "DeepSeek 账户余额不足，请检查服务端账号"
-                    413 -> "照片过大，请换一张清晰且较小的照片"
-                    429 -> "识别请求过于频繁，请稍后再试"
-                    in 500..599 -> "识别服务暂时不可用，请稍后再试"
-                    else -> "识别失败（${response.code}），请手动填写"
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val message = when (response.code) {
+                        401, 403 -> "识别服务拒绝访问，请检查访问口令"
+                        402 -> "DeepSeek 账户余额不足，请检查服务端账号"
+                        413 -> "照片过大，请换一张清晰且较小的照片"
+                        429 -> "识别请求过于频繁，请稍后再试"
+                        in 500..599 -> "识别服务暂时不可用，请稍后再试"
+                        else -> "识别失败（${response.code}），请手动填写"
+                    }
+                    error(message)
                 }
-                error(message)
+                val raw = response.body?.string() ?: error("识别服务没有返回内容")
+                val fields = JSONObject(raw).optJSONObject("fields") ?: error("识别结果格式不正确")
+                fun value(key: String): String? = fields.optString(key).trim().take(120).ifBlank { null }
+                val quantity = fields.optInt("quantity", 0).takeIf { it in 1..1_000_000 }
+                WarehouseRecognitionFields(
+                    productName = value("productName"), quantity = quantity, unit = value("unit"),
+                    batchCode = value("batchCode"), expiry = value("expiry"),
+                    location = value("location"), destination = value("destination"),
+                    supplier = value("supplier"), purchasePrice = value("purchasePrice")
+                )
             }
-            val raw = response.body?.string() ?: error("识别服务没有返回内容")
-            val fields = JSONObject(raw).optJSONObject("fields") ?: error("识别结果格式不正确")
-            fun value(key: String): String? = fields.optString(key).trim().take(120).ifBlank { null }
-            val quantity = fields.optInt("quantity", 0).takeIf { it in 1..1_000_000 }
-            return WarehouseRecognitionFields(
-                productName = value("productName"), quantity = quantity, unit = value("unit"),
-                batchCode = value("batchCode"), expiry = value("expiry"),
-                location = value("location"), destination = value("destination"),
-                supplier = value("supplier"), purchasePrice = value("purchasePrice")
-            )
+        } catch (_: SocketTimeoutException) {
+            error("连接识别服务超时。请检查手机网络；仍失败时可先手动填写")
+        } catch (_: IOException) {
+            error("无法连接识别服务。请切换手机网络后重试，或先手动填写")
         }
     }
 

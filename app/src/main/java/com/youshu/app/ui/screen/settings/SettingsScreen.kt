@@ -283,7 +283,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text("HTTPS 服务地址") },
-                placeholder = { Text("https://example.workers.dev") }
+                placeholder = { Text("https://你的服务地址") }
             )
             OutlinedTextField(
                 value = serviceToken,

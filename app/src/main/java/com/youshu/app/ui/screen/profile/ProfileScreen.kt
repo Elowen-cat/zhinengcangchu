@@ -210,7 +210,7 @@ fun ProfileScreen(
         ) {
             Text(
                 if (viewModel.warehouseRecognitionConfigured) "拍照和语音建议仅用于填写草稿，确认前仍需人工核对。"
-                else "当前可手动入库、出库和核对草稿；照片保留作核对依据，语音使用设备提供的识别服务。旧云函数已停用。",
+                else "当前可手动入库、出库和核对草稿；照片和语音识别需等待新版服务配置。",
                 fontSize = 14.sp,
                 color = TextSecondary
             )

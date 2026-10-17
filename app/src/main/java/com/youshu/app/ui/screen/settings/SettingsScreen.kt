@@ -137,8 +137,8 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.size(6.dp))
                 Text(
                     text = if (state.recognitionServiceConfigured)
-                        "已预设照片识别服务，拍照后可直接发起识别；这里也可以切换到你自己的服务。"
-                    else "照片识别需要服务地址和访问口令；DeepSeek API Key 只保存在服务端。",
+                        "已预设智能服务，拍照、语音和聊天可直接使用；这里只供维护者调整。"
+                    else "智能服务尚未预设；普通用户请安装最新版本。DeepSeek API Key 只保存在服务端。",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )

@@ -294,6 +294,11 @@ fun AgentChatScreen(
             Toast.makeText(context, "录音太短，再说一次试试", Toast.LENGTH_SHORT).show()
             return
         }
+        if (elapsed > 60_000 || file.length() > 2_000_000) {
+            runCatching { file.delete() }
+            Toast.makeText(context, "语音最长 60 秒，请缩短后再试", Toast.LENGTH_SHORT).show()
+            return
+        }
         viewModel.submitVoiceMessage(
             audioPath = file.absolutePath,
             openEditorAfterTranscription = target == VoiceGestureTarget.Edit

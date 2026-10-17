@@ -3,8 +3,10 @@
 const crypto = require("node:crypto");
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
-const MAX_BODY_BYTES = 2_500_000;
+const ASR_URL = "https://asr.tencentcloudapi.com/";
+const MAX_BODY_BYTES = 3_200_000;
 const MAX_IMAGE_LENGTH = 1_700_000;
+const MAX_AUDIO_BYTES = 2_000_000;
 const FIELD_NAMES = [
   "productName", "unit", "batchCode", "expiry", "location",
   "destination", "supplier", "purchasePrice"
@@ -71,7 +73,118 @@ function cleanFields(value) {
   return fields;
 }
 
-exports.main_handler = async (event) => {
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function hmac(key, value) {
+  return crypto.createHmac("sha256", key).update(value).digest();
+}
+
+async function transcribeAudio(input, context) {
+  const credentials = {
+    id: context?.TENCENTCLOUD_SECRETID || process.env.TENCENTCLOUD_SECRETID,
+    key: context?.TENCENTCLOUD_SECRETKEY || process.env.TENCENTCLOUD_SECRETKEY,
+    token: context?.TENCENTCLOUD_SESSIONTOKEN || process.env.TENCENTCLOUD_SESSIONTOKEN
+  };
+  if (!credentials.id || !credentials.key || !credentials.token) {
+    return reply(503, { error: "asr_role_not_configured" });
+  }
+  const prefix = "data:audio/wav;base64,";
+  if (typeof input.audio !== "string" || !input.audio.startsWith(prefix)) {
+    return reply(400, { error: "invalid_audio" });
+  }
+  const encoded = input.audio.slice(prefix.length);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return reply(400, { error: "invalid_audio" });
+  const audio = Buffer.from(encoded, "base64");
+  if (audio.length < 1000 || audio.length > MAX_AUDIO_BYTES ||
+      audio.toString("ascii", 0, 4) !== "RIFF" ||
+      audio.toString("ascii", 8, 12) !== "WAVE" ||
+      audio.readUInt32LE(24) !== 16_000 || audio.readUInt16LE(22) !== 1) {
+    return reply(400, { error: "invalid_audio" });
+  }
+  const payload = JSON.stringify({
+    EngSerViceType: "16k_zh", SourceType: 1, VoiceFormat: "wav",
+    Data: encoded, DataLen: audio.length
+  });
+  const timestamp = Math.floor(Date.now() / 1000);
+  const date = new Date(timestamp * 1000).toISOString().slice(0, 10);
+  const scope = `${date}/asr/tc3_request`;
+  const contentType = "application/json; charset=utf-8";
+  const canonicalRequest = `POST\n/\n\ncontent-type:${contentType}\nhost:asr.tencentcloudapi.com\n\ncontent-type;host\n${sha256(payload)}`;
+  const stringToSign = `TC3-HMAC-SHA256\n${timestamp}\n${scope}\n${sha256(canonicalRequest)}`;
+  const signingKey = hmac(hmac(hmac(`TC3${credentials.key}`, date), "asr"), "tc3_request");
+  const signature = crypto.createHmac("sha256", signingKey).update(stringToSign).digest("hex");
+  const authorization = `TC3-HMAC-SHA256 Credential=${credentials.id}/${scope}, SignedHeaders=content-type;host, Signature=${signature}`;
+  try {
+    const upstream = await fetch(ASR_URL, {
+      method: "POST",
+      headers: {
+        "content-type": contentType,
+        authorization,
+        "x-tc-action": "SentenceRecognition",
+        "x-tc-version": "2019-06-14",
+        "x-tc-timestamp": String(timestamp),
+        "x-tc-token": credentials.token
+      },
+      body: payload,
+      signal: AbortSignal.timeout(45_000)
+    });
+    if (!upstream.ok) return reply(502, { error: "asr_unavailable" });
+    const result = (await upstream.json())?.Response;
+    if (result?.Error) {
+      const code = String(result.Error.Code || "");
+      if (code.includes("UserNotRegistered")) return reply(503, { error: "asr_not_opened" });
+      if (code.includes("NoAmount") || code.includes("NoFreeAmount")) {
+        return reply(402, { error: "asr_quota" });
+      }
+      if (code.includes("AuthFailure") || code.includes("Unauthorized")) {
+        return reply(503, { error: "asr_role_permission" });
+      }
+      return reply(502, { error: "asr_unavailable" });
+    }
+    const transcript = typeof result?.Result === "string" ? result.Result.trim() : "";
+    return transcript ? reply(200, { transcript }) : reply(422, { error: "empty_transcript" });
+  } catch {
+    return reply(502, { error: "asr_unavailable" });
+  }
+}
+
+async function proxyChat(input) {
+  if (!Array.isArray(input.messages) || input.messages.length < 1 || input.messages.length > 30 ||
+      (input.tools != null && (!Array.isArray(input.tools) || input.tools.length > 30))) {
+    return reply(400, { error: "invalid_chat" });
+  }
+  const body = JSON.stringify({
+    model: "deepseek-flash", stream: false,
+    messages: input.messages,
+    ...(input.tools ? { tools: input.tools } : {}),
+    ...(input.tool_choice ? { tool_choice: input.tool_choice } : {}),
+    max_tokens: Math.floor(Math.min(Math.max(Number(input.max_tokens) || 1024, 128), 2048)),
+    temperature: typeof input.temperature === "number" ? input.temperature : 0.3
+  });
+  try {
+    const upstream = await fetch(DEEPSEEK_URL, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "content-type": "application/json"
+      },
+      body,
+      signal: AbortSignal.timeout(40_000)
+    });
+    if (!upstream.ok) {
+      if (upstream.status === 402) return reply(402, { error: "provider_balance" });
+      if (upstream.status === 429) return reply(429, { error: "provider_busy" });
+      return reply(502, { error: "upstream_unavailable" });
+    }
+    return reply(200, await upstream.json());
+  } catch {
+    return reply(502, { error: "recognition_unavailable" });
+  }
+}
+
+exports.main_handler = async (event, context) => {
   const path = (event?.path || "/").replace(/\/+$/, "") || "/";
   const method = String(event?.httpMethod || "").toUpperCase();
   if (path === "/health" && method === "GET") {
@@ -82,7 +195,11 @@ exports.main_handler = async (event) => {
 
   const photo = path === "/v1/recognize-photo";
   const transcript = path === "/v1/interpret-transcript";
-  if (method !== "POST" || (!photo && !transcript)) return reply(404, { error: "not_found" });
+  const audio = path === "/v1/transcribe-audio";
+  const chat = path === "/v1/deepseek/chat/completions";
+  if (method !== "POST" || (!photo && !transcript && !audio && !chat)) {
+    return reply(404, { error: "not_found" });
+  }
   if (!process.env.DEEPSEEK_API_KEY || !process.env.APP_ACCESS_TOKEN) {
     return reply(503, { error: "service_unavailable" });
   }
@@ -103,7 +220,8 @@ exports.main_handler = async (event) => {
   } catch {
     return reply(400, { error: "invalid_json" });
   }
-  if (!input || !["inbound", "outbound"].includes(input.direction)) {
+  if (!input || typeof input !== "object" ||
+      ((photo || transcript) && !["inbound", "outbound"].includes(input.direction))) {
     return reply(400, { error: "invalid_direction" });
   }
   if (photo && (typeof input.image !== "string" ||
@@ -121,6 +239,9 @@ exports.main_handler = async (event) => {
   if (!limit("global", 15, now) || !limit(`client:${clientIp}`, 6, now)) {
     return reply(429, { error: "demo_busy" });
   }
+
+  if (audio) return transcribeAudio(input, context);
+  if (chat) return proxyChat(input);
 
   const direction = input.direction === "inbound" ? "入库" : "出库";
   const content = photo ? [

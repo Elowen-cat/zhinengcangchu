@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.youshu.app.data.local.entity.ItemDetail
-import com.youshu.app.data.network.BackendApiClient
+import com.youshu.app.data.network.OwnedAiServiceClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -26,7 +26,7 @@ import javax.inject.Singleton
 
 @Singleton
 class AiInferenceRepository @Inject constructor(
-    private val backendApiClient: BackendApiClient
+    private val ownedAiServiceClient: OwnedAiServiceClient
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -149,36 +149,16 @@ class AiInferenceRepository @Inject constructor(
             val audioFile = File(audioPath)
             require(audioFile.exists()) { "语音文件不存在" }
             require(audioFile.length() > 44) { "录音太短，请再说一次" }
-            require(audioFile.length() <= MAX_ASR_AUDIO_BYTES) { "语音太长，请控制在 5 分钟以内" }
+            require(audioFile.length() <= MAX_ASR_AUDIO_BYTES) { "语音太长，请控制在 60 秒以内" }
 
             val audioBase64 = Base64.encodeToString(audioFile.readBytes(), Base64.NO_WRAP)
             val body = buildJsonObject {
-                put("stream", false)
-                putJsonArray("messages") {
-                    add(
-                        buildJsonObject {
-                            put("role", "user")
-                            put("content", buildJsonArray {
-                                add(
-                                    buildJsonObject {
-                                        put("type", "input_audio")
-                                        putJsonObject("input_audio") {
-                                            put("data", "data:audio/wav;base64,$audioBase64")
-                                        }
-                                    }
-                                )
-                            })
-                        }
-                    )
-                }
-                putJsonObject("asr_options") {
-                    put("language", "zh")
-                    put("enable_itn", true)
-                }
+                put("audio", "data:audio/wav;base64,$audioBase64")
             }.toString()
 
-            executeChatRequest(QWEN_CHAT_PATH, body, PURPOSE_SPEECH).trim()
-                .takeIf { it.isNotBlank() }
+            val response = ownedAiServiceClient.postJson(TRANSCRIBE_AUDIO_PATH, body)
+            json.parseToJsonElement(response).jsonObject["transcript"]?.jsonPrimitive?.contentOrNull?.trim()
+                ?.takeIf { it.isNotBlank() }
                 ?: error("语音没有识别出文字")
         }
     }
@@ -216,15 +196,14 @@ class AiInferenceRepository @Inject constructor(
             }
         }.toString()
 
-        return executeChatRequest(QWEN_CHAT_PATH, body, PURPOSE_VISION)
+        return executeChatRequest(DEEPSEEK_CHAT_PATH, body)
     }
 
     private suspend fun executeChatRequest(
         path: String,
-        body: String,
-        purpose: String? = null
+        body: String
     ): String {
-        val responseBody = backendApiClient.postJson(path, body, purpose)
+        val responseBody = ownedAiServiceClient.postJson(path, body)
         val obj = json.parseToJsonElement(responseBody).jsonObject
         return obj["choices"]
             ?.jsonArray
@@ -304,9 +283,7 @@ class AiInferenceRepository @Inject constructor(
 
     private companion object {
         const val DEEPSEEK_CHAT_PATH = "/v1/deepseek/chat/completions"
-        const val QWEN_CHAT_PATH = "/v1/qwen/chat/completions"
-        const val PURPOSE_VISION = "vision"
-        const val PURPOSE_SPEECH = "speech"
-        const val MAX_ASR_AUDIO_BYTES = 10 * 1024 * 1024
+        const val TRANSCRIBE_AUDIO_PATH = "/v1/transcribe-audio"
+        const val MAX_ASR_AUDIO_BYTES = 2_000_000
     }
 }

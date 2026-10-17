@@ -2,8 +2,7 @@ package com.youshu.app.data.agent
 
 import com.youshu.app.data.local.entity.Item
 import com.youshu.app.data.local.entity.ItemDetail
-import com.youshu.app.data.network.BackendApiClient
-import com.youshu.app.data.network.BackendStreamEvent
+import com.youshu.app.data.network.OwnedAiServiceClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -29,7 +28,7 @@ import javax.inject.Singleton
 
 @Singleton
 class AgentClient @Inject constructor(
-    private val backendApiClient: BackendApiClient,
+    private val ownedAiServiceClient: OwnedAiServiceClient,
     private val inventoryTool: InventoryAgentTool,
     private val weatherTool: WeatherAgentTool
 ) {
@@ -293,48 +292,29 @@ class AgentClient @Inject constructor(
     // ──────────────────────────────────────────
 
     private suspend fun executeApiCall(body: String): String =
-        backendApiClient.postJson(DEEPSEEK_CHAT_PATH, body)
+        ownedAiServiceClient.postJson(DEEPSEEK_CHAT_PATH, body)
 
     private suspend fun collectStreamingRound(
         body: String,
         exposeText: Boolean,
         onEvent: suspend (AgentReplyEvent) -> Unit
     ): AgentRound {
-        val assembler = AgentStreamAssembler()
-        val visibleTextGuard = AgentVisibleTextGuard()
-        var resetSent = false
-        var visibleTextSent = false
-        backendApiClient.postSse(DEEPSEEK_CHAT_PATH, body).collect { event ->
-            assembler.accept(event)
-            when (event) {
-                is BackendStreamEvent.TextDelta -> {
-                    if (exposeText) {
-                        val visible = visibleTextGuard.accept(event.text)
-                        if (visible.isNotEmpty()) {
-                            visibleTextSent = true
-                            onEvent(AgentReplyEvent.AppendText(visible))
-                        }
-                        if (visibleTextGuard.protocolDetected && visibleTextSent && !resetSent) {
-                            resetSent = true
-                            onEvent(AgentReplyEvent.ResetText)
-                        }
-                    }
-                }
-                is BackendStreamEvent.ToolCallDelta -> {
-                    if (exposeText && assembler.requiresVisibleTextReset && !resetSent) {
-                        resetSent = true
-                        onEvent(AgentReplyEvent.ResetText)
-                    }
-                }
-                is BackendStreamEvent.Done -> {
-                    if (exposeText) {
-                        val remaining = visibleTextGuard.flush()
-                        if (remaining.isNotEmpty()) onEvent(AgentReplyEvent.AppendText(remaining))
-                    }
-                }
-            }
+        val response = ownedAiServiceClient.postJson(DEEPSEEK_CHAT_PATH, body)
+        val root = json.parseToJsonElement(response).jsonObject
+        val choice = root["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?: error("AI 响应格式异常：无 choices")
+        val message = choice["message"]?.jsonObject ?: error("AI 响应格式异常：无 message")
+        val rawText = message["content"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val parsed = AgentProtocolText.parse(rawText)
+        val calls = extractToolCalls(response).ifEmpty { parsed.toolCalls }
+        if (exposeText && calls.isEmpty() && parsed.visibleText.isNotBlank()) {
+            onEvent(AgentReplyEvent.AppendText(parsed.visibleText))
         }
-        return assembler.buildCompletedRound()
+        return AgentRound(
+            text = parsed.visibleText,
+            toolCalls = calls,
+            finishReason = choice["finish_reason"]?.jsonPrimitive?.contentOrNull
+        )
     }
 
     private suspend fun emitFallback(

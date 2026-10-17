@@ -2,6 +2,7 @@ package com.youshu.app.ui.warehouse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.youshu.app.data.ai.AiInferenceRepository
 import com.youshu.app.data.warehouse.RecognitionDirection
 import com.youshu.app.data.warehouse.WarehousePhotoRecognitionRequest
 import com.youshu.app.data.warehouse.WarehouseRecognitionFields
@@ -19,12 +20,41 @@ data class WarehouseRecognitionUiState(
     val message: String? = null
 )
 
+data class WarehouseVoiceUiState(
+    val working: Boolean = false,
+    val transcript: String? = null,
+    val message: String? = null
+)
+
 @HiltViewModel
 class WarehouseRecognitionViewModel @Inject constructor(
-    private val gateway: WarehouseRecognitionGateway
+    private val gateway: WarehouseRecognitionGateway,
+    private val aiInferenceRepository: AiInferenceRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow(WarehouseRecognitionUiState())
     val state = _state.asStateFlow()
+    private val _voiceState = MutableStateFlow(WarehouseVoiceUiState())
+    val voiceState = _voiceState.asStateFlow()
+
+    fun transcribeVoice(audioPath: String) {
+        if (_voiceState.value.working) return
+        _voiceState.value = WarehouseVoiceUiState(working = true)
+        viewModelScope.launch {
+            aiInferenceRepository.transcribeSpeech(audioPath)
+                .onSuccess { text ->
+                    _voiceState.value = WarehouseVoiceUiState(
+                        transcript = text,
+                        message = "语音已转成文字，请核对后填入字段"
+                    )
+                }
+                .onFailure { failure ->
+                    _voiceState.value = WarehouseVoiceUiState(
+                        message = failure.message ?: "语音识别失败，请再试一次"
+                    )
+                }
+            runCatching { java.io.File(audioPath).delete() }
+        }
+    }
 
     fun recognizePhoto(direction: EntryDirection, photoUris: List<String>) {
         if (_state.value.working) return

@@ -342,7 +342,7 @@ class AgentChatViewModel @Inject constructor(
                             rawMessage.contains("timed out", ignoreCase = true) ->
                             "语音识别超时了，可能是网络慢，稍后再试一次。"
                         rawMessage.contains("401") || rawMessage.contains("API Key", ignoreCase = true) ->
-                            "语音识别没有连上通义千问，请检查 Qwen 的 API Key。"
+                            "语音服务连接失败，请联系应用维护者。"
                         rawMessage.isNotBlank() -> rawMessage
                         else -> "语音识别失败了，再试一次。"
                     }

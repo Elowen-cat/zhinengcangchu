@@ -1,10 +1,9 @@
 package com.youshu.app.ui.warehouse
 
-import android.app.Activity
+import android.Manifest
 import android.content.Context
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
-import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -33,7 +32,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.youshu.app.util.WavAudioRecorder
 import java.io.File
 import java.time.LocalDate
 import java.util.UUID
@@ -60,7 +61,7 @@ fun WarehouseTransactionHomeScreen(
             }
         }
         item { EntryCard("拍照录入", "拍摄商品或包装，进入人工核对字段", Icons.Default.CameraAlt) { onSource(EntrySource.PHOTO) } }
-        item { EntryCard("语音录入", "调用设备语音识别；结果可编辑核对", Icons.Default.Mic) { onSource(EntrySource.VOICE) } }
+        item { EntryCard("语音录入", "录音后转成文字；结果可编辑核对", Icons.Default.Mic) { onSource(EntrySource.VOICE) } }
         item { EntryCard("待确认", state.drafts.count { it.direction == direction }.toString() + if (state.previewMode) " 条预览草稿" else " 条待处理单据", Icons.Default.TaskAlt, onPending) }
         item { WarehouseAction("手动填写", { onSource(EntrySource.MANUAL) }) }
     }
@@ -117,6 +118,29 @@ fun WarehouseStockFormScreen(
     var saveMessage by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val voiceRecorder = remember(context) { WavAudioRecorder(context.applicationContext) }
+    var recordingVoice by remember { mutableStateOf(false) }
+    var voiceStartedAt by remember { mutableStateOf(0L) }
+    val voiceState by recognitionViewModel.voiceState.collectAsState()
+    LaunchedEffect(voiceState.transcript) {
+        voiceState.transcript?.let { transcript = it }
+    }
+    DisposableEffect(voiceRecorder) {
+        onDispose { voiceRecorder.cancel() }
+    }
+
+    fun startWarehouseVoice() {
+        val started = runCatching { voiceRecorder.start() }.isSuccess
+        if (started) {
+            voiceStartedAt = System.currentTimeMillis()
+            recordingVoice = true
+        } else {
+            saveMessage = "录音启动失败，请检查麦克风权限"
+        }
+    }
+    val voicePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startWarehouseVoice() else saveMessage = "需要麦克风权限才能录音"
+    }
     var galleryPhotos by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     val allPhotos = (photos + galleryPhotos).distinct()
     val recognition by recognitionViewModel.state.collectAsState()
@@ -124,13 +148,6 @@ fun WarehouseStockFormScreen(
         val copied = selected.mapNotNull { copyWarehousePhoto(context, it) }
         galleryPhotos = (galleryPhotos + copied).distinct()
         if (selected.isNotEmpty() && copied.isEmpty()) saveMessage = "照片读取失败，请重新选择或手动录入"
-    }
-    val speechLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val spoken = if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        } else null
-        if (spoken.isNullOrBlank()) saveMessage = "未取得语音结果，可直接手动填写"
-        else { transcript = spoken; saveMessage = "转写完成，请核对并按需填入字段" }
     }
     val amount = quantity.toIntOrNull()
     val reserved = state.drafts.filter { it.id != draftId && it.direction == EntryDirection.OUTBOUND && it.batchId == batch?.id && it.productId == product?.id }
@@ -259,18 +276,40 @@ fun WarehouseStockFormScreen(
                     WarehouseCard {
                         Column(Modifier.padding(16.dp)) {
                             Text("语音录入", color = WarehousePalette.Navy, fontWeight = FontWeight.Bold)
-                            Text("说出带标签的内容，如“商品鲜牛奶，数量5，单位瓶，批次A01”；识别失败可直接手填。",
+                            Text("说出带标签的内容，如“商品鲜牛奶，数量5，单位瓶，批次A01”；录音最长 60 秒，识别失败可直接手填。",
                                 color = WarehousePalette.Muted, fontSize = 13.sp)
                             TextButton(onClick = {
-                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
-                                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "说出商品、数量、批次等字段")
+                                if (recordingVoice) {
+                                    val file = voiceRecorder.stop()
+                                    recordingVoice = false
+                                    val elapsed = System.currentTimeMillis() - voiceStartedAt
+                                    when {
+                                        file == null || !file.exists() ||
+                                            file.length() < WavAudioRecorder.MIN_AUDIO_BYTES -> {
+                                            file?.delete()
+                                            saveMessage = "录音太短，请再说一次"
+                                        }
+                                        elapsed > 60_000 || file.length() > 2_000_000 -> {
+                                            file.delete()
+                                            saveMessage = "录音超过 60 秒，请缩短后重试"
+                                        }
+                                        else -> recognitionViewModel.transcribeVoice(file.absolutePath)
+                                    }
+                                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                                    PackageManager.PERMISSION_GRANTED) {
+                                    startWarehouseVoice()
+                                } else {
+                                    voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                 }
-                                try { speechLauncher.launch(intent) }
-                                catch (_: Exception) { saveMessage = "当前设备没有可用语音识别服务，请手动填写" }
-                            }) { Icon(Icons.Default.Mic, null); Text("开始语音识别") }
+                            }, enabled = !voiceState.working) {
+                                Icon(Icons.Default.Mic, null)
+                                Text(when {
+                                    voiceState.working -> "正在识别…"
+                                    recordingVoice -> "结束录音并识别"
+                                    else -> "开始录音"
+                                })
+                            }
+                            voiceState.message?.let { Text(it, color = WarehousePalette.Muted, fontSize = 12.sp) }
                             OutlinedTextField(transcript, { transcript = it }, Modifier.fillMaxWidth().padding(top = 10.dp),
                                 label = { Text("识别文本（可编辑）") })
                             TextButton(onClick = {

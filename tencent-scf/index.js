@@ -258,8 +258,11 @@ exports.main_handler = async (event, context) => {
       },
       body: JSON.stringify({
         model: "deepseek-flash",
+        // Extraction needs a short final JSON answer. Thinking is enabled by default
+        // and can consume the entire output budget before content is produced.
+        thinking: { type: "disabled" },
         temperature: 0,
-        max_tokens: 300,
+        max_tokens: 1024,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
@@ -274,9 +277,19 @@ exports.main_handler = async (event, context) => {
       return reply(502, { error: "upstream_unavailable" });
     }
     const result = await upstream.json();
-    const rawResult = result?.choices?.[0]?.message?.content;
-    if (typeof rawResult !== "string") return reply(502, { error: "invalid_result" });
-    return reply(200, { fields: cleanFields(JSON.parse(rawResult)) });
+    const choice = result?.choices?.[0];
+    if (choice?.finish_reason === "length") return reply(502, { error: "model_output_truncated" });
+    const rawResult = choice?.message?.content;
+    if (typeof rawResult !== "string" || !rawResult.trim()) {
+      return reply(502, { error: "empty_model_result" });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(rawResult);
+    } catch {
+      return reply(502, { error: "invalid_model_json" });
+    }
+    return reply(200, { fields: cleanFields(parsed) });
   } catch {
     return reply(502, { error: "recognition_unavailable" });
   }

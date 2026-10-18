@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import com.youshu.app.data.warehouse.WarehouseRecognitionFields
 import com.youshu.app.util.WavAudioRecorder
 import java.io.File
 import java.time.LocalDate
@@ -122,9 +123,12 @@ fun WarehouseStockFormScreen(
     var recordingVoice by remember { mutableStateOf(false) }
     var voiceStartedAt by remember { mutableStateOf(0L) }
     val voiceState by recognitionViewModel.voiceState.collectAsState()
-    LaunchedEffect(voiceState.transcript) {
-        voiceState.transcript?.let { transcript = it }
-    }
+    val transcriptRecognition by recognitionViewModel.transcriptState.collectAsState()
+    val recognition by recognitionViewModel.state.collectAsState()
+    var autoRequestedPhoto by rememberSaveable { mutableStateOf<String?>(null) }
+    var appliedPhotoResult by rememberSaveable { mutableStateOf<String?>(null) }
+    var consumedVoiceTranscriptId by rememberSaveable { mutableStateOf<String?>(null) }
+    var appliedTranscriptResult by rememberSaveable { mutableStateOf<String?>(null) }
     DisposableEffect(voiceRecorder) {
         onDispose { voiceRecorder.cancel() }
     }
@@ -143,11 +147,87 @@ fun WarehouseStockFormScreen(
     }
     var galleryPhotos by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     val allPhotos = (photos + galleryPhotos).distinct()
-    val recognition by recognitionViewModel.state.collectAsState()
+    val firstPhoto = allPhotos.firstOrNull()
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
         val copied = selected.mapNotNull { copyWarehousePhoto(context, it) }
         galleryPhotos = (galleryPhotos + copied).distinct()
         if (selected.isNotEmpty() && copied.isEmpty()) saveMessage = "照片读取失败，请重新选择或手动录入"
+    }
+    fun applyRecognizedFields(fields: WarehouseRecognitionFields) {
+        if (fields.isEmpty) return
+        if (inbound) {
+            fields.productName?.let { suggested ->
+                name = suggested
+                val match = state.products.firstOrNull { it.name.trim() == suggested.trim() }
+                chosenProductId = match?.id
+                if (match == null && fields.unit == null) unit = ""
+                match?.let {
+                    if (fields.unit == null) unit = it.unit
+                }
+            }
+            fields.unit?.let { unit = it }
+            fields.batchCode?.let { batchCode = it }
+            fields.expiry?.let { expiry = it }
+            fields.location?.let { location = it }
+            fields.supplier?.let { supplier = it }
+            fields.purchasePrice?.let { price = it }
+        } else {
+            fields.productName?.let { suggested ->
+                val match = state.products.firstOrNull { it.name.trim() == suggested.trim() }
+                chosenProductId = match?.id
+                batchId = null
+                match?.let {
+                    batchId = if (fields.batchCode != null) {
+                        it.batches.firstOrNull { batch -> batch.code == fields.batchCode && batch.available() }?.id
+                    } else it.sortedBatches.firstOrNull { batch -> batch.available() }?.id
+                }
+            }
+            if (fields.productName == null) fields.batchCode?.let { code ->
+                batchId = state.product(chosenProductId)?.batches?.firstOrNull {
+                    it.code == code && it.available()
+                }?.id
+            }
+            fields.destination?.let { destination = it }
+        }
+        fields.quantity?.let { quantity = it.toString() }
+        val missing = if (inbound) buildList {
+            if (name.isBlank()) add("商品名称")
+            if (quantity.isBlank()) add("数量")
+            if (unit.isBlank()) add("基础单位")
+            if (batchCode.isBlank()) add("批次")
+            if (location.isBlank()) add("库位")
+        } else buildList {
+            if (state.product(chosenProductId) == null) add("库存商品")
+            if (batchId == null) add("可用批次")
+        }
+        saveMessage = if (missing.isEmpty()) "字段已自动填入，请核对后保存草稿"
+            else "已自动填入识别结果；还需核对或填写${missing.joinToString("、")}"
+    }
+    LaunchedEffect(firstPhoto, source, draftId) {
+        if (source == EntrySource.PHOTO && draftId == null && firstPhoto != null && autoRequestedPhoto != firstPhoto) {
+            autoRequestedPhoto = firstPhoto
+            recognitionViewModel.recognizePhoto(direction, allPhotos)
+        }
+    }
+    LaunchedEffect(recognition.resultId, firstPhoto) {
+        if (recognition.resultId != null && recognition.resultId != appliedPhotoResult && recognition.sourcePhoto == firstPhoto) {
+            appliedPhotoResult = recognition.resultId
+            recognition.fields?.let(::applyRecognizedFields)
+        }
+    }
+    LaunchedEffect(voiceState.transcriptId) {
+        if (voiceState.transcriptId != null && voiceState.transcriptId != consumedVoiceTranscriptId) voiceState.transcript?.let { text ->
+            consumedVoiceTranscriptId = voiceState.transcriptId
+            transcript = text
+            recognitionViewModel.interpretTranscript(direction, text)
+        }
+    }
+    LaunchedEffect(transcriptRecognition.resultId, transcript) {
+        if (transcriptRecognition.resultId != null && transcriptRecognition.resultId != appliedTranscriptResult &&
+            transcriptRecognition.sourceTranscript == transcript.trim()) {
+            appliedTranscriptResult = transcriptRecognition.resultId
+            transcriptRecognition.fields?.let(::applyRecognizedFields)
+        }
     }
     val amount = quantity.toIntOrNull()
     val reserved = state.drafts.filter { it.id != draftId && it.direction == EntryDirection.OUTBOUND && it.batchId == batch?.id && it.productId == product?.id }
@@ -202,7 +282,7 @@ fun WarehouseStockFormScreen(
                 item {
                     WarehouseCard {
                         Column(Modifier.padding(16.dp)) {
-                            Text("点击识别会将第一张照片经你的服务发送给 DeepSeek；结果仅供核对，确认单据后才改变库存。", color = WarehousePalette.Muted, fontSize = 13.sp)
+                            Text("添加照片后会自动识别第一张，并填入能确认的字段；请核对并补充缺失信息，确认单据后才改变库存。", color = WarehousePalette.Muted, fontSize = 13.sp)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 allPhotos.take(2).forEach { uri -> AsyncImage(uri, "商品照片", Modifier.size(90.dp).padding(top = 10.dp)) }
                             }
@@ -214,7 +294,7 @@ fun WarehouseStockFormScreen(
                             TextButton(
                                 onClick = { recognitionViewModel.recognizePhoto(direction, allPhotos) },
                                 enabled = allPhotos.isNotEmpty() && !recognition.working
-                            ) { Text(if (recognition.working) "正在识别…" else "识别第一张照片") }
+                            ) { Text(if (recognition.working) "正在识别并填表…" else "重新识别第一张照片") }
                             if (recognition.sourcePhoto == allPhotos.firstOrNull()) {
                                 recognition.message?.let {
                                     Text(it, color = WarehousePalette.Muted, fontSize = 12.sp)
@@ -233,38 +313,6 @@ fun WarehouseStockFormScreen(
                                     ).joinToString(" · ")
                                     Text(summary.ifBlank { "没有提取到可靠字段，请手动填写" },
                                         color = WarehousePalette.Navy, fontSize = 13.sp)
-                                    if (summary.isNotBlank()) TextButton(onClick = {
-                                        if (inbound) {
-                                            fields.productName?.let { name = it }
-                                            fields.unit?.let { unit = it }
-                                            fields.batchCode?.let { batchCode = it }
-                                            fields.expiry?.let { expiry = it }
-                                            fields.location?.let { location = it }
-                                            fields.supplier?.let { supplier = it }
-                                            fields.purchasePrice?.let { price = it }
-                                        } else {
-                                            var unmatchedBatch = false
-                                            val match = fields.productName?.let { suggested ->
-                                                state.products.firstOrNull { it.name == suggested }
-                                            }
-                                            if (match != null) {
-                                                chosenProductId = match.id
-                                                batchId = if (fields.batchCode != null) {
-                                                    match.batches.firstOrNull {
-                                                        it.code == fields.batchCode && it.available()
-                                                    }?.id.also { unmatchedBatch = it == null }
-                                                } else match.sortedBatches.firstOrNull { it.available() }?.id
-                                            }
-                                            fields.destination?.let { destination = it }
-                                            saveMessage = when {
-                                                match == null -> "未找到同名库存商品，请手动选择商品和批次"
-                                                unmatchedBatch -> "识别批次与可用库存不符，请手动选择批次"
-                                                else -> "候选字段已填入，请逐项核对后保存草稿"
-                                            }
-                                        }
-                                        fields.quantity?.let { quantity = it.toString() }
-                                        if (inbound) saveMessage = "候选字段已填入，请逐项核对后保存草稿"
-                                    }) { Text("填入表单并核对") }
                                 }
                             }
                         }
@@ -276,7 +324,7 @@ fun WarehouseStockFormScreen(
                     WarehouseCard {
                         Column(Modifier.padding(16.dp)) {
                             Text("语音录入", color = WarehousePalette.Navy, fontWeight = FontWeight.Bold)
-                            Text("说出带标签的内容，如“商品鲜牛奶，数量5，单位瓶，批次A01”；录音最长 60 秒，识别失败可直接手填。",
+                            Text("直接说商品和你知道的信息，如“鲜牛奶 5 瓶，批次 A01”。语音转成文字后会自动提取并填表；不确定的字段留给你核对。录音最长 60 秒。",
                                 color = WarehousePalette.Muted, fontSize = 13.sp)
                             TextButton(onClick = {
                                 if (recordingVoice) {
@@ -312,33 +360,16 @@ fun WarehouseStockFormScreen(
                             voiceState.message?.let { Text(it, color = WarehousePalette.Muted, fontSize = 12.sp) }
                             OutlinedTextField(transcript, { transcript = it }, Modifier.fillMaxWidth().padding(top = 10.dp),
                                 label = { Text("识别文本（可编辑）") })
+                            if (transcriptRecognition.working && transcriptRecognition.sourceTranscript == transcript.trim()) {
+                                Text("正在理解文字并填入字段…", color = WarehousePalette.Teal, fontSize = 12.sp)
+                            } else if (transcriptRecognition.sourceTranscript == transcript.trim()) {
+                                transcriptRecognition.message?.let { Text(it, color = WarehousePalette.Muted, fontSize = 12.sp) }
+                            }
                             TextButton(onClick = {
-                                val fields = WarehouseVoiceDraftParser.parse(transcript)
-                                if (fields.isEmpty) {
-                                    saveMessage = "未找到明确标签字段，请手动核对"
-                                } else {
-                                    if (inbound) {
-                                        fields.productName?.let { name = it }
-                                        fields.unit?.let { unit = it }
-                                        fields.batchCode?.let { batchCode = it }
-                                        fields.expiry?.let { expiry = it }
-                                        fields.location?.let { location = it }
-                                    } else {
-                                        fields.productName?.let { spokenName ->
-                                            state.products.firstOrNull { it.name == spokenName }?.let { match ->
-                                                chosenProductId = match.id
-                                                batchId = match.sortedBatches.firstOrNull { it.available() }?.id
-                                            }
-                                        }
-                                        fields.batchCode?.let { code ->
-                                            state.product(chosenProductId)?.batches?.firstOrNull { it.code == code }?.let { batchId = it.id }
-                                        }
-                                        fields.destination?.let { destination = it }
-                                    }
-                                    fields.quantity?.let { quantity = it.toString() }
-                                    saveMessage = "已填入可识别字段，请逐项核对后保存草稿"
-                                }
-                            }, enabled = transcript.isNotBlank()) { Text("从文本填入字段") }
+                                recognitionViewModel.interpretTranscript(direction, transcript)
+                            }, enabled = transcript.isNotBlank() && !transcriptRecognition.working) {
+                                Text("从文本填入字段")
+                            }
                         }
                     }
                 }

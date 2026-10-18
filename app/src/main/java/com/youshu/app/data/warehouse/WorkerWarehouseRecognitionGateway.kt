@@ -74,7 +74,8 @@ class WorkerWarehouseRecognitionGateway @Inject constructor(
                 }
                 val raw = response.body?.string() ?: error("识别服务没有返回内容")
                 val fields = JSONObject(raw).optJSONObject("fields") ?: error("识别结果格式不正确")
-                fun value(key: String): String? = fields.optString(key).trim().take(120).ifBlank { null }
+                fun value(key: String): String? = if (fields.isNull(key)) null
+                    else fields.optString(key).trim().take(120).ifBlank { null }
                 val quantity = fields.optInt("quantity", 0).takeIf { it in 1..1_000_000 }
                 WarehouseRecognitionFields(
                     productName = value("productName"), quantity = quantity, unit = value("unit"),

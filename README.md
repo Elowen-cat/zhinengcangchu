@@ -81,6 +81,8 @@
 
 [打开下载页](https://elowen-cat.github.io/zhinengcangchu/) · [直接下载 Android APK](https://elowen-cat.github.io/zhinengcangchu/smart-warehouse-1.8.1.apk)
 
+**1.8.3 自动填表测试版：** [下载 Android APK](https://elowen-cat.github.io/zhinengcangchu/smart-warehouse-1.8.3-test.apk)。仓储语音转文字后会自动理解日常口述并填入能确定的字段；手动修改文字后仍可点“从文本填入字段”。拍照或从相册添加商品照片后会自动识别并填表。只说商品名称时会先填写名称，未说出的数量、单位、批次和库位仍需人工核对补充。出库时若照片或口述的批次与库存不符，不会自动选其他批次。保存草稿后仍须人工确认才改变库存。此版等待妈妈在真实手机上验证，正式下载页暂保留 1.8.1。
+
 网站文件位于 `docs/`，通过 GitHub Pages 发布。APK 中不含 DeepSeek API Key；公开下载的 1.8.1 使用 Cloudflare Worker，1.8.2 测试包使用腾讯云云函数。照片识别需要联网；手动入库、出库和库存查询使用手机本地数据。
 
 **智能服务迁移进度（2026-10-18）：** 有真机遇到 `workers.dev` 连接超时；现已部署[腾讯云云函数版本](tencent-scf/README.md)，电脑端 HTTPS 健康检查、文字提取、文字聊天和合成录音转写成功。1.8.2 测试 APK 已预置服务 URL 与演示访问口令，妈妈与评委无需输入。手机拍照识别的 502 已用矿泉水原图复现并定位到模型输出被 300 token 截断；修复版部署后，同一原图的线上请求返回 200，识别出百岁山饮用天然矿泉水、1 瓶。仍待妈妈在手机上复测拍照和两个语音入口；公开下载页暂保留 1.8.1。

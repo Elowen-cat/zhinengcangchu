@@ -13,7 +13,11 @@ data class WarehouseRecognitionFields(
     val destination: String? = null,
     val supplier: String? = null,
     val purchasePrice: String? = null
-)
+) {
+    val isEmpty: Boolean get() = productName == null && quantity == null && unit == null &&
+        batchCode == null && expiry == null && location == null && destination == null &&
+        supplier == null && purchasePrice == null
+}
 
 enum class RecognitionDirection { INBOUND, OUTBOUND }
 

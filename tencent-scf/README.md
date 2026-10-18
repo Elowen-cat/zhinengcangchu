@@ -4,6 +4,8 @@
 
 **当前状态（2026-10-18）：** 广州函数已部署，HTTPS 根地址为 `https://1509339681-dwhhcp4gwl.ap-guangzhou.tencentscf.com`。`GET /health`、入库口述字段提取、文字聊天和合成 WAV 语音转写已在电脑端成功。妈妈的 1.8.2 手机安装包拍照时收到 502；用她拍的矿泉水原图在电脑端复现。原函数给 DeepSeek 的 `max_tokens` 仅 300，而思考模式默认开启：原图的模型响应 `finish_reason=length`、`content` 为空。修复版关闭字段提取的思考模式并将上限设为 1024。用户重新部署后，同一原图调用线上接口返回 200，字段为百岁山饮用天然矿泉水、1 瓶。**手机拍照和两个语音入口仍待妈妈真机复测。**公开首页的正式下载按钮仍指向 1.8.1，1.8.2 测试 APK 有独立下载地址。
 
+**1.8.3 自动填表测试包：** [直接下载](https://elowen-cat.github.io/zhinengcangchu/smart-warehouse-1.8.3-test.apk)。仓储语音转写后自动调用 `/v1/interpret-transcript`，可理解不带“商品、数量”等固定标签的日常口述；用户改好文字后仍可手动重试。拍照或从相册选图后自动识别并填入表单。缺失字段留空，由操作者核对补充；出库识别出的批次若不匹配可用库存，不会自动选其他批次。此包只供真机验证，公开首页暂不切换。
+
 ## 更新已有函数：修复拍照识别
 
 打开腾讯云控制台 → 云函数 SCF → 广州 → `warehouse-recognition` → **函数代码**。把本目录的 `warehouse-recognition-scf.zip` 作为新的函数代码上传，然后点击**部署**。保留已有的执行方法 `index.main_handler`、环境变量、运行角色及函数 URL，不需要重新创建函数或让手机重新安装 APK。腾讯云的[更新函数说明](https://cloud.tencent.com/document/product/583/84097)确认代码更新需部署到 `$LATEST`。

@@ -61,8 +61,8 @@ android {
         applicationId = "com.youshu.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.8.2"
+        versionCode = 12
+        versionName = "1.8.3"
         buildConfigField("String", "WAREHOUSE_DEMO_BASE_URL", "\"$competitionDemoBaseUrl\"")
         buildConfigField("String", "WAREHOUSE_DEMO_ACCESS_TOKEN", "\"$competitionDemoToken\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

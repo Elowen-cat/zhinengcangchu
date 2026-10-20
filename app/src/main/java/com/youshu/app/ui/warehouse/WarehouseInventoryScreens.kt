@@ -69,23 +69,18 @@ fun WarehouseInventoryScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StockFilter.entries.forEach { choice ->
                     val selected = filter == choice
-                    val warning = when (choice) {
-                        StockFilter.EMPTY -> WarehouseStockStatus.OUT_OF_STOCK
-                        StockFilter.LOW -> WarehouseStockStatus.LOW
-                        else -> null
-                    }
                     FilterChip(selected = selected, onClick = { filterName = choice.name },
                         label = {
                             Text(choice.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                                 maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                                color = if (selected) Color.White else warning?.accent ?: WarehousePalette.Navy)
+                                color = if (selected) Color.White else WarehousePalette.Navy)
                         },
                         modifier = Modifier.weight(1f).height(40.dp),
                         shape = RoundedCornerShape(24.dp),
-                        border = BorderStroke(1.dp, if (selected) Color.Transparent else warning?.accent?.copy(alpha = 0.3f) ?: WarehousePalette.Border),
+                        border = BorderStroke(1.dp, if (selected) Color.Transparent else WarehousePalette.Border),
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = Color.White.copy(alpha = 0.45f),
-                            selectedContainerColor = warning?.accent ?: WarehousePalette.Teal, selectedLabelColor = Color.White))
+                            selectedContainerColor = WarehousePalette.Teal, selectedLabelColor = Color.White))
                 }
             }
             if (category.isNotEmpty() || location.isNotEmpty()) {

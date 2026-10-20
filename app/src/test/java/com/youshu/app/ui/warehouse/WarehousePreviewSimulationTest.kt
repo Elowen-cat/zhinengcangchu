@@ -21,14 +21,15 @@ class WarehousePreviewSimulationTest {
         location = "冷藏区 / A-02",
         reason = if (direction == EntryDirection.OUTBOUND) "补到货架" else "收货",
         destination = if (direction == EntryDirection.OUTBOUND) "销售区" else "冷藏区 / A-02",
-        supplier = "",
-        purchasePrice = "",
+        supplier = "示例乳品批发商",
+        purchasePrice = "2.60",
         reviewed = reviewed
     )
 
     @Test fun inboundThenOutboundChangesPreviewStockAndLedger() {
         val state = WarehouseUiState()
         state.enablePreview()
+        val initialMovements = state.movements.toList()
         assertEquals(24, state.product("milk")?.availableQuantity)
 
         state.save(draft(EntryDirection.INBOUND, 5))
@@ -40,19 +41,55 @@ class WarehousePreviewSimulationTest {
         state.save(draft(EntryDirection.OUTBOUND, 2))
         assertNull(state.simulateConfirmation(EntryDirection.OUTBOUND))
         assertEquals(27, state.product("milk")?.availableQuantity)
-        assertEquals(listOf(EntryDirection.OUTBOUND, EntryDirection.INBOUND), state.movements.map { it.direction })
+        assertEquals(listOf(EntryDirection.OUTBOUND, EntryDirection.INBOUND), state.movements.take(2).map { it.direction })
+        assertEquals(initialMovements, state.movements.drop(2))
+        assertEquals("示例乳品批发商", state.movements[1].supplier)
+        assertEquals("2.60", state.movements[1].purchasePrice)
         assertTrue(state.drafts.isEmpty())
     }
 
     @Test fun uncheckedAndExcessOutboundDraftsDoNotChangeStock() {
         val state = WarehouseUiState()
         state.enablePreview()
+        val initialMovements = state.movements.toList()
         state.save(draft(EntryDirection.OUTBOUND, 2, reviewed = false))
         assertNotNull(state.simulateConfirmation(EntryDirection.OUTBOUND))
         state.save(draft(EntryDirection.OUTBOUND, 2))
         state.save(draft(EntryDirection.OUTBOUND, 9))
         assertNotNull(state.simulateConfirmation(EntryDirection.OUTBOUND))
         assertEquals(24, state.product("milk")?.availableQuantity)
-        assertTrue(state.movements.isEmpty())
+        assertEquals(initialMovements, state.movements.toList())
+    }
+
+    @Test fun sampleLedgerBalancesMatchEachBatchAndShowPurchaseMetadata() {
+        val state = WarehouseUiState()
+        state.enablePreview()
+        assertTrue(state.previewMode)
+        assertEquals(EntryDirection.entries.toSet(), state.movements.map { it.direction }.toSet())
+        state.products.forEach { product ->
+            product.batches.forEach { batch ->
+                val balance = state.movements.filter { it.productId == product.id && it.batchCode == batch.code }
+                    .sumOf { when (it.direction) {
+                        EntryDirection.INBOUND, EntryDirection.COUNT -> it.quantity
+                        EntryDirection.OUTBOUND -> -it.quantity
+                        EntryDirection.TRANSFER -> 0
+                    } }
+                assertEquals("${product.name} ${batch.code}", batch.quantity, balance)
+            }
+        }
+        val purchases = state.movements.filter { it.direction == EntryDirection.INBOUND }
+        assertTrue(purchases.isNotEmpty())
+        assertTrue(purchases.all { it.supplier.isNotBlank() && it.purchasePrice.toBigDecimal() > java.math.BigDecimal.ZERO })
+        assertTrue(state.movements.filter { it.direction != EntryDirection.INBOUND }
+            .all { it.supplier.isBlank() && it.purchasePrice.isBlank() })
+        assertTrue(state.drafts.isEmpty())
+    }
+
+    @Test fun previewResetDoesNotDuplicateExampleRecords() {
+        val state = WarehouseUiState()
+        state.enablePreview()
+        val original = state.movements.toList()
+        state.enablePreview()
+        assertEquals(original, state.movements.toList())
     }
 }

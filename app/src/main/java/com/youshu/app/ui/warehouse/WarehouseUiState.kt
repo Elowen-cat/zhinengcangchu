@@ -93,7 +93,9 @@ data class WarehouseMovementUi(
     val unit: String,
     val note: String,
     val time: LocalDateTime = LocalDateTime.now(),
-    val reason: String = ""
+    val reason: String = "",
+    val supplier: String = "",
+    val purchasePrice: String = ""
 )
 
 class WarehouseUiState {
@@ -114,6 +116,7 @@ class WarehouseUiState {
         products.addAll(warehousePreviewProducts())
         drafts.clear()
         movements.clear()
+        movements.addAll(warehousePreviewMovements(products.toList()))
     }
 
     /** Applies reviewed drafts to the isolated Debug preview only. Returns an error or null on success. */
@@ -174,7 +177,8 @@ class WarehouseUiState {
                     })
                 }
                 if (index >= 0) products[index] = product else products.add(product)
-                movements.add(0, WarehouseMovementUi(product.id, product.name, line.batchCode, direction, line.quantity, line.unit, "收货 · ${line.location}"))
+                movements.add(0, WarehouseMovementUi(product.id, product.name, line.batchCode, direction, line.quantity, line.unit,
+                    "收货 · ${line.location}", supplier = line.supplier, purchasePrice = line.purchasePrice))
             } else {
                 val index = products.indexOfFirst { it.id == line.productId }
                 val current = products[index]
@@ -220,15 +224,18 @@ class WarehouseUiViewModel @Inject constructor(private val repository: Warehouse
         }
         viewModelScope.launch {
             combine(repository.observeMovements(), repository.observeConfirmedDocuments()) { rows, documents ->
-                val reasons = documents.associate { it.id to it.reason }
-                rows.map { it to reasons[it.documentId].orEmpty() }
+                val documentsById = documents.associateBy { it.id }
+                rows.map { it to documentsById[it.documentId] }
             }.collect { rows ->
                 if (!state.previewMode) {
                     state.movements.clear()
-                    state.movements.addAll(rows.map { (row, reason) ->
+                    state.movements.addAll(rows.map { (row, document) ->
                         WarehouseMovementUi(row.productId, row.productName, row.batchCode,
                             EntryDirection.valueOf(row.direction), row.quantity, row.unit, row.note,
-                            LocalDateTime.ofInstant(Instant.ofEpochMilli(row.createdAt), ZoneId.systemDefault()), reason)
+                            LocalDateTime.ofInstant(Instant.ofEpochMilli(row.createdAt), ZoneId.systemDefault()),
+                            reason = document?.reason.orEmpty(),
+                            supplier = if (row.direction == EntryDirection.INBOUND.name) document?.supplier.orEmpty() else "",
+                            purchasePrice = if (row.direction == EntryDirection.INBOUND.name) document?.purchasePrice.orEmpty() else "")
                     })
                 }
             }

@@ -127,6 +127,20 @@ internal object WarehouseDashboardIcons {
         }
     }
 
+    val Transfer by lazy {
+        icon("Transfer") {
+            path(stroke = gradient(0xFFAE68DE, 0xFF792FB2), strokeLineWidth = 5.5f, strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = androidx.compose.ui.graphics.StrokeJoin.Round) {
+                moveTo(10f, 14f); lineTo(33f, 14f)
+                curveTo(39f, 14f, 40f, 18f, 40f, 22f)
+                moveTo(16f, 7f); lineTo(9f, 14f); lineTo(16f, 21f)
+                moveTo(38f, 34f); lineTo(15f, 34f)
+                curveTo(9f, 34f, 8f, 30f, 8f, 26f)
+                moveTo(32f, 27f); lineTo(39f, 34f); lineTo(32f, 41f)
+            }
+        }
+    }
+
     val Count by lazy {
         icon("Count") {
             path(fill = gradient(0xFFA67AC3, 0xFF744298)) {

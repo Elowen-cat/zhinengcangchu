@@ -2,7 +2,6 @@ package com.youshu.app.ui.warehouse
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,8 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.time.temporal.ChronoUnit
-import java.time.LocalDate
 
 @Composable
 fun WarehouseInventoryScreen(
@@ -155,8 +152,8 @@ fun WarehouseProductDetailScreen(
     onOutbound: (String?) -> Unit,
     onTransfer: () -> Unit
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var selectedBatch by remember { mutableStateOf<WarehouseBatchUi?>(null) }
+    var expanded by rememberSaveable(product?.id) { mutableStateOf(false) }
+    var selectedBatch by remember(product?.id) { mutableStateOf<WarehouseBatchUi?>(null) }
     LazyColumn(
         Modifier.fillMaxSize().background(WarehousePalette.Background),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -184,67 +181,39 @@ fun WarehouseProductDetailScreen(
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    WarehouseAction("入库", onReceive, Modifier.weight(1f))
-                    WarehouseAction("出库", { onOutbound(null) }, Modifier.weight(1f), enabled = product.availableQuantity > 0)
-                    WarehouseAction("移库", onTransfer, Modifier.weight(1f), enabled = product.availableQuantity > 0)
-                }
+                InventoryActionPanel(product.availableQuantity > 0, onReceive, { onOutbound(null) }, onTransfer)
             }
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("库存批次", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = WarehousePalette.Navy)
-                    Text("共 " + product.batches.size + " 批", color = WarehousePalette.Muted)
+                    TextButton(onClick = { expanded = !expanded }, enabled = product.sortedBatches.isNotEmpty()) {
+                        Text("共 ${product.batches.size} 批 · ${if (expanded) "收起" else "展开"}", color = WarehousePalette.Muted, fontSize = 12.sp)
+                        Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            if (expanded) "收起全部批次" else "展开全部批次", tint = WarehousePalette.Muted, modifier = Modifier.size(22.dp))
+                    }
                 }
-            }
-            if (product.sortedBatches.isEmpty()) {
-                item { WarehouseEmpty("暂无可用批次", "收货确认后，这里会显示数量、效期和库位。") }
-            } else if (!expanded) {
-                item {
-                    BatchCard(product.sortedBatches.first(), product.unit, onClick = { expanded = true }, expand = true)
-                }
-            } else {
-                item {
-                    TextButton(onClick = { expanded = false }) { Icon(Icons.Default.ExpandLess, null); Text("收起全部批次") }
-                    Text("按临期、优先出库、正常排序；同状态按效期排序。", color = WarehousePalette.Muted, fontSize = 12.sp)
-                }
-                items(product.sortedBatches, key = { it.id }) { batch ->
-                    BatchCard(batch, product.unit, onClick = { selectedBatch = batch }, expand = false)
-                }
-                item { Text("合计可用 " + product.availableQuantity + " " + product.unit, color = WarehousePalette.Teal, fontWeight = FontWeight.Bold) }
             }
             item {
                 WarehouseCard {
-                    Column(Modifier.padding(18.dp)) {
-                        Text("库存流水", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = WarehousePalette.Navy)
-                        if (movements.isNotEmpty()) {
-                            movements.take(5).forEach { movement ->
-                                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Column {
-                                        Text((if (preview) "模拟" else "") + movement.direction.label, color = WarehousePalette.Navy, fontWeight = FontWeight.SemiBold)
-                                        Text(movement.batchCode + " · " + movement.note, color = WarehousePalette.Muted, fontSize = 12.sp)
-                                    }
-                                    val amount = when (movement.direction) {
-                                        EntryDirection.INBOUND -> "+${movement.quantity}"
-                                        EntryDirection.OUTBOUND -> "−${movement.quantity}"
-                                        EntryDirection.COUNT -> when {
-                                            movement.quantity > 0 -> "+${movement.quantity}"
-                                            movement.quantity < 0 -> "−${-movement.quantity}"
-                                            else -> "0"
-                                        }
-                                        EntryDirection.TRANSFER -> "移 ${movement.quantity}"
-                                    }
-                                    Text(amount + " " + movement.unit,
-                                        color = if (movement.direction == EntryDirection.OUTBOUND) WarehousePalette.Blue else WarehousePalette.Teal,
-                                        fontWeight = FontWeight.Bold)
-                                }
-                            }
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("批次明细", color = WarehousePalette.Navy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        if (product.sortedBatches.isEmpty()) {
+                            Text("暂无有库存的批次，确认收货后会显示在这里。", color = WarehousePalette.Muted, fontSize = 13.sp)
                         } else {
-                            Text(if (preview) "暂无模拟流水；可在入库或出库草稿中完成模拟确认" else "暂无库存流水；确认入库或出库后将在这里显示",
-                                color = WarehousePalette.Muted, modifier = Modifier.padding(top = 12.dp))
+                            (if (expanded) product.sortedBatches else product.sortedBatches.take(1)).forEach { batch ->
+                                InventoryBatchRow(batch, product.unit, onClick = { selectedBatch = batch })
+                            }
+                        }
+                        HorizontalDivider(color = WarehousePalette.Border.copy(alpha = 0.6f))
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("合计可用  ", color = WarehousePalette.Muted, fontSize = 16.sp)
+                            Text("${product.availableQuantity} ${product.unit}", color = WarehousePalette.Teal, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
+            item { InventoryMovementPanel(product.id, movements, preview) }
         }
         item { Spacer(Modifier.height(12.dp)) }
     }
@@ -258,33 +227,5 @@ fun WarehouseProductDetailScreen(
             },
             dismissButton = { TextButton(onClick = { selectedBatch = null }) { Text("关闭") } }
         )
-    }
-}
-
-@Composable
-private fun BatchCard(batch: WarehouseBatchUi, unit: String, onClick: () -> Unit, expand: Boolean) {
-    val status = batch.status()
-    WarehouseCard {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(4.dp).height(108.dp).background(status.color()))
-            Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                Text(batch.code, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = WarehousePalette.Navy)
-                Text("效期 " + (batch.expiry?.toString() ?: "未设置"), color = WarehousePalette.Muted, modifier = Modifier.padding(top = 8.dp))
-                Text("可用 " + (if (batch.available()) batch.quantity else 0) + " " + unit, color = WarehousePalette.Blue, fontWeight = FontWeight.Bold)
-                Text(batch.location, color = WarehousePalette.Muted, fontSize = 12.sp)
-                Text(
-                    batch.expiry?.let {
-                        val days = ChronoUnit.DAYS.between(LocalDate.now(), it)
-                        if (days < 0) "已过期 " + -days + " 天" else if (days == 0L) "今天到期" else days.toString() + " 天后到期"
-                    } ?: "效期需人工核对",
-                    color = status.color(), fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                StatusTag(status.label, status.color())
-                Icon(if (expand) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
-                    if (expand) "展开全部批次" else "查看批次", tint = WarehousePalette.Muted, modifier = Modifier.padding(top = 12.dp).size(32.dp))
-            }
-        }
     }
 }

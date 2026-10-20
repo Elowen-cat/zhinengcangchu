@@ -126,9 +126,7 @@ fun AppNavGraph(uiPreview: Boolean = false) {
                         state.products.count { it.isLow }.toString(), state.drafts.count { it.direction == EntryDirection.INBOUND }.toString(),
                         state.movements.count { it.direction == EntryDirection.OUTBOUND && it.time.toLocalDate() == java.time.LocalDate.now() }
                             .toString() + " 笔",
-                        state.products.filter { it.isNear || it.isLow }.map {
-                            PreviewTask(it.name, if (it.isNear) "批次进入临期窗口" else "低于安全库存", if (it.isNear) "临期" else "低库存", true)
-                        }
+                        warehousePendingTasks(state.products.toList())
                     )
                 )
             }

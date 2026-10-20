@@ -44,11 +44,12 @@ fun WarehousePage(
 }
 
 @Composable
-fun WarehouseCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+fun WarehouseCard(modifier: Modifier = Modifier, color: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.White,
+    content: @Composable () -> Unit) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = androidx.compose.ui.graphics.Color.White,
+        color = color,
         shadowElevation = 4.dp,
         content = content
     )

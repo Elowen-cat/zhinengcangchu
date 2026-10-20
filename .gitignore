@@ -49,3 +49,7 @@ UI草图.png
 # Public download page packages are generated from the Android build.
 /download-site/public/*.apk
 /download-site/public/parts/
+
+# Local deployment caches and build logs.
+/download-site/.wrangler/
+/stage2-*.log

@@ -1,6 +1,7 @@
 package com.youshu.app.ui.warehouse
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.temporal.ChronoUnit
@@ -64,10 +68,24 @@ fun WarehouseInventoryScreen(
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StockFilter.entries.forEach { choice ->
-                    FilterChip(selected = filter == choice, onClick = { filterName = choice.name },
-                        label = { Text(choice.label, fontSize = 12.sp, color = if (filter == choice) androidx.compose.ui.graphics.Color.White else WarehousePalette.Navy) }, modifier = Modifier.weight(1f),
+                    val selected = filter == choice
+                    val warning = when (choice) {
+                        StockFilter.EMPTY -> WarehouseStockStatus.OUT_OF_STOCK
+                        StockFilter.LOW -> WarehouseStockStatus.LOW
+                        else -> null
+                    }
+                    FilterChip(selected = selected, onClick = { filterName = choice.name },
+                        label = {
+                            Text(choice.label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                                maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                color = if (selected) Color.White else warning?.accent ?: WarehousePalette.Navy)
+                        },
+                        modifier = Modifier.weight(1f).height(40.dp),
                         shape = RoundedCornerShape(24.dp),
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = WarehousePalette.Teal, selectedLabelColor = androidx.compose.ui.graphics.Color.White))
+                        border = BorderStroke(1.dp, if (selected) Color.Transparent else warning?.accent?.copy(alpha = 0.3f) ?: WarehousePalette.Border),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White.copy(alpha = 0.45f),
+                            selectedContainerColor = warning?.accent ?: WarehousePalette.Teal, selectedLabelColor = Color.White))
                 }
             }
             if (category.isNotEmpty() || location.isNotEmpty()) {
@@ -80,23 +98,29 @@ fun WarehouseInventoryScreen(
                 if (state.products.isEmpty()) "从收货入口创建第一条草稿，核对后确认入库。" else "试试修改关键词或筛选条件。") }
         }
         items(products, key = { it.id }) { product ->
-            WarehouseCard {
-                Row(Modifier.fillMaxWidth().clickable { onProduct(product.id) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ProductThumb()
+            val tone = product.stockStatus
+            Surface(
+                onClick = { onProduct(product.id) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = tone.background,
+                border = BorderStroke(1.dp, tone.border),
+                shadowElevation = 1.dp
+            ) {
+                Row(Modifier.fillMaxWidth()
+                    .background(Brush.linearGradient(listOf(tone.background, tone.backgroundEnd)))
+                    .padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ProductThumb(accent = tone.accent, background = Color.White.copy(alpha = 0.7f))
                     Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                         Text(product.name, color = WarehousePalette.Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Text(product.availableQuantity.toString() + " " + product.unit, color = WarehousePalette.Blue,
+                        Text(product.availableQuantity.toString() + " " + product.unit,
+                            color = if (tone.isStockWarning) tone.accent else WarehousePalette.Blue,
                             fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
                         Text((product.sortedBatches.firstOrNull()?.location ?: "暂无可用批次") + " · " + product.batches.size + " 批",
                             color = WarehousePalette.Muted, fontSize = 12.sp, maxLines = 1)
                     }
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        when {
-                            product.availableQuantity == 0 -> StatusTag("缺货", WarehousePalette.Red)
-                            product.isNear -> StatusTag("临期", WarehousePalette.Orange)
-                            product.isLow -> StatusTag("低库存", WarehousePalette.Red)
-                            else -> StatusTag("正常")
-                        }
+                        StockStatusTag(tone)
                         Icon(Icons.Default.ChevronRight, "查看库存详情", tint = WarehousePalette.Muted)
                     }
                 }
@@ -149,12 +173,15 @@ fun WarehouseProductDetailScreen(
             item { WarehouseEmpty("商品暂不可用", "返回库存列表选择其他商品。") }
         } else {
             item {
-                WarehouseCard {
+                val status = product.stockStatus
+                WarehouseCard(color = status.background) {
                     Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ProductThumb(Modifier.size(92.dp))
-                        Column(Modifier.padding(start = 18.dp)) {
+                        ProductThumb(Modifier.size(92.dp), status.accent, Color.White.copy(alpha = 0.7f))
+                        Column(Modifier.weight(1f).padding(start = 18.dp)) {
                             Text(product.name, color = WarehousePalette.Navy, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Text("可用 " + product.availableQuantity + " " + product.unit, color = WarehousePalette.Teal,
+                            Spacer(Modifier.height(8.dp))
+                            StockStatusTag(status)
+                            Text("可用 " + product.availableQuantity + " " + product.unit, color = status.accent,
                                 fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp))
                             Text(product.sortedBatches.firstOrNull()?.location ?: "暂无批次", color = WarehousePalette.Muted)
                         }

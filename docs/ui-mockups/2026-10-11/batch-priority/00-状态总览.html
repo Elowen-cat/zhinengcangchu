@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>库存批次状态总览</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { width: 768px; margin: 0; padding: 14px 12px 18px; background: #f1f7f8; color: #142542; font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
+    h1 { margin: 0 0 3px; font-size: 23px; line-height: 32px; }
+    .subtitle { margin: 0 0 12px; color: #71839d; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 368px); gap: 13px 8px; }
+    figure { margin: 0; width: 368px; }
+    figcaption { height: 29px; padding: 3px 7px 5px; display: flex; align-items: center; gap: 8px; color: #172845; font-size: 14px; font-weight: 700; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #da5358; }
+    .priority .dot { background: #e88420; }
+    .normal .dot { background: #20987d; }
+    .expanded .dot { background: #1d718d; }
+    img { display: block; width: 368px; height: 812px; border-radius: 17px; box-shadow: 0 5px 18px rgba(33,64,82,.11); }
+  </style>
+</head>
+<body>
+  <h1>库存批次 · 状态总览</h1>
+  <p class="subtitle">收起态始终突出当前最高优先级批次；箭头展开后按临期、优先出库、正常排序。</p>
+  <div class="grid">
+    <figure class="near"><figcaption><i class="dot"></i>临期 · 收起</figcaption><img src="01-临期-收起.png" alt="临期收起态"></figure>
+    <figure class="priority"><figcaption><i class="dot"></i>优先出库 · 收起</figcaption><img src="02-优先出库-收起.png" alt="优先出库收起态"></figure>
+    <figure class="normal"><figcaption><i class="dot"></i>正常 · 收起</figcaption><img src="03-正常-收起.png" alt="正常收起态"></figure>
+    <figure class="expanded"><figcaption><i class="dot"></i>全部批次 · 展开</figcaption><img src="04-批次全部展开.png" alt="所有批次展开态"></figure>
+  </div>
+</body>
+</html>

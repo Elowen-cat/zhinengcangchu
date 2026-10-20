@@ -45,9 +45,9 @@ fun WarehouseAction(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 }
 
 @Composable
-fun ProductThumb(modifier: Modifier = Modifier) {
-    Box(modifier.size(60.dp).background(WarehousePalette.Mint, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.Inventory2, null, tint = WarehousePalette.Teal, modifier = Modifier.size(30.dp))
+fun ProductThumb(modifier: Modifier = Modifier, accent: Color = WarehousePalette.Teal, background: Color = WarehousePalette.Mint) {
+    Box(modifier.size(60.dp).background(background, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+        Icon(Icons.Default.Inventory2, null, tint = accent, modifier = Modifier.size(30.dp))
     }
 }
 
@@ -66,6 +66,13 @@ fun WarehouseEmpty(title: String, description: String) {
 fun StatusTag(label: String, color: Color = WarehousePalette.Teal) {
     Text(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.background(color.copy(alpha = 0.09f), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
+}
+
+@Composable
+fun StockStatusTag(status: WarehouseStockStatus) {
+    Text(status.label, color = status.badgeText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.background(status.badgeBackground, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp))
 }
 
 fun BatchStatus.color(): Color = when (this) {

@@ -383,12 +383,14 @@ fun WarehouseStockFormScreen(
                         } else {
                             Text("商品", color = WarehousePalette.Muted)
                             OutlinedButton(onClick = { chooseProduct = true }, modifier = Modifier.fillMaxWidth()) { Text(product?.name ?: "选择库存商品") }
+                            product?.let { StockStatusTag(it.stockStatus) }
                             Text("批次（按效期优先推荐，请核对）", color = WarehousePalette.Muted, fontSize = 13.sp)
                             OutlinedButton(onClick = { chooseBatch = true }, enabled = product != null, modifier = Modifier.fillMaxWidth()) {
                                 Text(batch?.code ?: "选择可用批次")
                             }
                             Text("效期：" + (batch?.expiry?.toString() ?: "未设置") + " · " + (batch?.location ?: "未选择库位"), color = WarehousePalette.Muted, fontSize = 12.sp)
-                            Text("可用 " + (batch?.quantity ?: 0) + " " + product?.unit.orEmpty(), color = WarehousePalette.Teal, fontWeight = FontWeight.Bold)
+                            Text("可用 " + (batch?.quantity ?: 0) + " " + product?.unit.orEmpty(),
+                                color = product?.stockStatus?.accent ?: WarehousePalette.Muted, fontWeight = FontWeight.Bold)
                         }
                         FormField("数量", quantity, { quantity = it }, keyboardType = KeyboardType.Number)
                         if (inbound) {
@@ -430,7 +432,8 @@ fun WarehouseStockFormScreen(
                             chosenProductId = choice.id
                             batchId = choice.sortedBatches.firstOrNull { it.available() }?.id
                             chooseProduct = false
-                        }) { Text(choice.name + " · " + choice.availableQuantity + " " + choice.unit) }
+                        }) { Text(choice.name + " · " + choice.availableQuantity + " " + choice.unit + " · " + choice.stockStatus.label,
+                            color = choice.stockStatus.accent) }
                     }
                 }
             }, confirmButton = { TextButton(onClick = { chooseProduct = false }) { Text("关闭") } })

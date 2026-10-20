@@ -51,10 +51,12 @@ fun WarehouseCountScreen(
                     TextButton(onClick = { selectProduct = true }, modifier = Modifier.fillMaxWidth()) {
                         Text(product?.name ?: "选择商品")
                     }
+                    product?.let { StockStatusTag(it.stockStatus) }
                     TextButton(onClick = { selectBatch = true }, enabled = product != null, modifier = Modifier.fillMaxWidth()) {
                         Text(batch?.let { "${it.code} · ${it.location}" } ?: "选择批次")
                     }
-                    Text("账面数量：${batch?.quantity ?: "—"} ${product?.unit.orEmpty()}", color = WarehousePalette.Teal)
+                    Text("账面数量：${batch?.quantity ?: "—"} ${product?.unit.orEmpty()}",
+                        color = product?.stockStatus?.accent ?: WarehousePalette.Muted)
                     OutlinedTextField(observed, { observed = it.filter(Char::isDigit); result = null },
                         modifier = Modifier.fillMaxWidth(), label = { Text("实盘数量") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
@@ -73,7 +75,7 @@ fun WarehouseCountScreen(
         }
     }
     if (selectProduct) {
-        AdjustmentPicker("选择商品", state.products.map { it.id to it.name }, { chosen ->
+        AdjustmentPicker("选择商品", state.products.map { it.id to "${it.name} · ${it.stockStatus.label}" }, { chosen ->
             productId = chosen; batchId = null; observed = ""; selectProduct = false
         }, { selectProduct = false })
     }

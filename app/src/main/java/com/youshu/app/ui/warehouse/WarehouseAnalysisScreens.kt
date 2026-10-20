@@ -60,14 +60,18 @@ fun WarehouseAnalysisScreen(state: WarehouseUiState, onProduct: (String) -> Unit
             item { Text("单品建议", color = WarehousePalette.Navy, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             results.forEach { result ->
                 item(key = result.product.id) {
-                    WarehouseCard {
+                    val status = result.product.stockStatus
+                    WarehouseCard(color = status.background) {
                         Row(Modifier.fillMaxWidth().clickable { onProduct(result.product.id) }.padding(18.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            ProductThumb()
+                            ProductThumb(accent = status.accent, background = Color.White.copy(alpha = 0.7f))
                             Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
                                 Text(result.product.name, color = WarehousePalette.Navy, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(6.dp))
+                                StockStatusTag(status)
                                 Text("现存 ${result.available} ${result.product.unit} · 近 14 天出库 ${result.effectiveOutbound} ${result.product.unit}",
-                                    color = WarehousePalette.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+                                    color = if (status.isStockWarning) status.accent else WarehousePalette.Muted,
+                                    fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
                                 Text(if (result.suggestedQuantity > 0) "建议补 ${result.suggestedQuantity} ${result.product.unit}" else "暂不补货",
                                     color = if (result.suggestedQuantity > 0) WarehousePalette.Teal else WarehousePalette.Blue,
                                     fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
@@ -98,11 +102,14 @@ fun WarehouseAnalysisDetailScreen(
             item { WarehouseEmpty("商品暂不可用", "返回分析列表选择其他商品。") }
         } else {
             val result = WarehouseReplenishment.calculate(product, movements, drafts)
+            val status = product.stockStatus
             item { WarehouseNotice(preview, "近 14 个自然日的已确认出库；只把“补到货架”计入需求。") }
             item {
-                WarehouseCard {
+                WarehouseCard(color = status.background) {
                     Column(Modifier.padding(20.dp)) {
                         Text(product.name, color = WarehousePalette.Navy, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        StockStatusTag(status)
                         Text(if (result.suggestedQuantity > 0) "建议补货 ${result.suggestedQuantity} ${product.unit}" else "暂不补货",
                             color = WarehousePalette.Teal, fontSize = 28.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 12.dp))
@@ -143,7 +150,8 @@ fun WarehouseAnalysisDetailScreen(
                         BasisRow("目标覆盖", "${product.targetCoverageDays} 天")
                         BasisRow("目标需求（向上取整）", "${result.targetDemand} ${product.unit}")
                         BasisRow("安全库存", "${product.safetyStock} ${product.unit}")
-                        BasisRow("当前可用库存", "${result.available} ${product.unit}")
+                        BasisRow("当前可用库存", "${result.available} ${product.unit}",
+                            if (status.isStockWarning) status.accent else WarehousePalette.Navy)
                         BasisRow("待确认收货（暂扣）", "${result.pendingInbound} ${product.unit}")
                         BasisRow("库存覆盖", result.coverageDays?.let { "${formatQuantity(it)} 天" } ?: "暂无有效出库")
                         Text("建议量 = max(0，目标需求 + 安全库存 − 可用库存 − 待确认收货)",
@@ -172,10 +180,10 @@ private fun AnalysisMetric(label: String, value: String, color: Color) {
 }
 
 @Composable
-private fun BasisRow(label: String, value: String) {
+private fun BasisRow(label: String, value: String, valueColor: Color = WarehousePalette.Navy) {
     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = WarehousePalette.Muted, fontSize = 13.sp)
-        Text(value, color = WarehousePalette.Navy, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(value, color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

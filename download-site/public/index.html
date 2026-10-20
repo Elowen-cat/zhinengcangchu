@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#eff7f5" />
+    <meta name="description" content="智能仓储 Android 体验版。打开页面，轻点按钮即可下载安装包。" />
+    <title>下载智能仓储 App</title>
+    <link rel="icon" type="image/png" href="/app-icon.png" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand"><img src="/app-icon.png" alt="" /><span>智能仓储</span></div>
+        <span class="topbar-label">Android 体验版</span>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <span class="eyebrow"><span class="eyebrow-dot"></span> 轻松管理家里的物品</span>
+            <h1 id="hero-title">智能仓储，<br /><em>点一下就下载。</em></h1>
+            <p class="hero-description">记录物品、查看库存、办理入库和出库，都可以在手机上完成。</p>
+
+            <div class="wechat-tip" id="wechat-tip" hidden>
+              如果你是在微信里打开：请先点右上角 <strong>···</strong>，选择<strong>在浏览器打开</strong>，然后再点下载。
+            </div>
+
+            <a class="download-button" href="/smart-warehouse-1.8.0.apk" download="smart-warehouse-1.8.0.apk" aria-label="下载智能仓储 Android 安装包，版本 1.8.0，约 24.7 MB">
+              <span class="download-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="download-text"><strong>立即下载安卓版</strong><small>点击后直接下载 APK</small></span>
+              <span class="download-arrow" aria-hidden="true">↗</span>
+            </a>
+            <p class="download-meta">版本 1.8.0 <span>·</span> 约 24.7 MB <span>·</span> 无需注册账号</p>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <div class="floating-chip chip-in">↘ <span>收货入库</span></div>
+            <div class="phone-frame"><img src="/workbench.png" alt="" /></div>
+            <div class="floating-chip chip-out">↗ <span>快速出库</span></div>
+          </div>
+        </section>
+
+        <section class="install-section" aria-labelledby="install-title">
+          <div class="section-intro"><span class="section-label">安装很简单</span><h2 id="install-title">跟着手机提示走就好</h2></div>
+          <ol class="steps">
+            <li><span class="step-number">01</span><div><h3>点击上面的下载按钮</h3><p>等待安装包下载完成。</p></div></li>
+            <li><span class="step-number">02</span><div><h3>打开下载好的文件</h3><p>在浏览器的“下载”中找到 smart-warehouse-1.8.0.apk。</p></div></li>
+            <li><span class="step-number">03</span><div><h3>按照提示安装</h3><p>如果手机询问是否允许安装，请按屏幕提示操作。</p></div></li>
+          </ol>
+          <p class="device-note">这是一款 Android 手机应用。苹果 iPhone 不能安装 APK 文件。</p>
+        </section>
+      </main>
+
+      <footer><span>智能仓储 · 比赛体验版</span><a href="#hero-title">返回顶部 ↑</a></footer>
+    </div>
+    <script>
+      if (/MicroMessenger/i.test(navigator.userAgent)) {
+        document.getElementById("wechat-tip").hidden = false;
+      }
+    </script>
+  </body>
+</html>

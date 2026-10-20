@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>库存批次高清状态稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      --ink: #102542;
+      --muted: #7183a1;
+      --blue: #1872c6;
+      --green: #15977d;
+      --line: #eaf0f4;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 430px; height: 932px; overflow: hidden; background: #f1f8f8; }
+    body { -webkit-font-smoothing: antialiased; }
+    button { font: inherit; }
+    .screen {
+      position: relative; width: 430px; height: 932px; overflow: hidden; isolation: isolate;
+      background:
+        radial-gradient(ellipse 260px 190px at 105% 12%, rgba(200,240,235,.4), transparent 72%),
+        radial-gradient(ellipse 260px 240px at -15% 50%, rgba(217,243,239,.48), transparent 72%),
+        linear-gradient(155deg, #f8fbfc 0%, #eff7f7 47%, #f7fbfb 100%);
+    }
+    .leaf { position: absolute; z-index: -1; pointer-events: none; opacity: .46; background: linear-gradient(135deg,rgba(187,234,227,.42),rgba(226,247,243,.18)); }
+    .leaf-a { width: 238px; height: 120px; right: -104px; top: 68px; border-radius: 100% 0 100% 0; transform: rotate(19deg); }
+    .leaf-b { width: 208px; height: 107px; right: -72px; top: 155px; border-radius: 0 100% 0 100%; transform: rotate(-27deg); opacity: .3; }
+    .leaf-c { width: 202px; height: 101px; left: -138px; top: 382px; border-radius: 100% 0 100% 0; transform: rotate(-23deg); opacity: .23; }
+    .statusbar { position: absolute; inset: 0 0 auto; height: 43px; padding: 0 20px 0 24px; display: flex; align-items: center; color: #080d14; font-size: 17px; font-weight: 750; letter-spacing: .1px; }
+    .island { position: absolute; left: 50%; top: 8px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: #03070b; box-shadow: inset -2px -1px 0 rgba(69,84,96,.52); }
+    .status-icons { margin-left: auto; display: flex; align-items: center; gap: 5px; height: 20px; }
+    .status-icons svg { display: block; height: 17px; fill: #080d14; }
+    .toolbar { position: absolute; top: 43px; left: 0; width: 100%; height: 54px; display: grid; grid-template-columns: 54px 1fr 54px; align-items: center; }
+    .back { margin-left: 9px; width: 36px; height: 40px; display: grid; place-items: center; color: #12233e; }
+    .back svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+    .page-title { margin: 0; text-align: center; color: #111827; font-size: 21px; line-height: 28px; font-weight: 760; letter-spacing: -.3px; }
+    .hero { position: absolute; top: 105px; left: 0; width: 430px; height: 164px; padding: 17px 18px; display: flex; gap: 19px; border: 1px solid rgba(255,255,255,.95); border-radius: 24px; background: linear-gradient(117deg,rgba(255,255,255,.98),rgba(255,255,255,.88) 69%,rgba(241,251,249,.92)); box-shadow: 0 8px 24px rgba(59,95,116,.055); }
+    .product-tile { width: 104px; height: 126px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid rgba(238,244,248,.85); border-radius: 20px; background: linear-gradient(145deg,#f6fafc,#edf5f7); }
+    .product-tile svg { width: 75px; height: 112px; overflow: visible; }
+    .product-copy { min-width: 0; padding-top: 2px; }
+    .product-name { color: #111d32; font-size: 21px; line-height: 28px; font-weight: 760; letter-spacing: -.35px; white-space: nowrap; }
+    .available { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; color: #7385a1; font-size: 18px; line-height: 43px; }
+    .available strong { color: #14826f; font-size: 39px; line-height: 43px; font-weight: 790; letter-spacing: -1.2px; }
+    .available b { color: #14826f; font-size: 17px; font-weight: 700; }
+    .location-line { margin-top: 0; display: flex; align-items: center; gap: 7px; color: #7082a0; font-size: 17px; line-height: 25px; white-space: nowrap; }
+    .location-line svg { width: 19px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+    .actions { position: absolute; top: 283px; left: 6px; right: 6px; height: 78px; display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .action { border: 1px solid rgba(255,255,255,.74); border-radius: 17px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 16px; font-weight: 730; }
+    .action svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .action-in { color: #118c72; background: linear-gradient(145deg,#e7f8f3,#dff4ef); }
+    .action-out { color: #1266c7; background: linear-gradient(145deg,#eaf4ff,#e2effe); }
+    .action-move { color: #833bb5; background: linear-gradient(145deg,#f4effb,#eee8fa); }
+    .section-heading { position: absolute; top: 383px; left: 10px; right: 12px; height: 34px; display: flex; align-items: center; justify-content: space-between; }
+    .section-title { color: #111827; font-size: 21px; line-height: 28px; font-weight: 780; letter-spacing: -.3px; }
+    .batch-count { padding: 5px 11px; border: 1px solid rgba(135,157,178,.14); border-radius: 999px; background: rgba(255,255,255,.77); color: #71839e; font-size: 13px; line-height: 18px; font-weight: 650; }
+    .batch-card {
+      --tone: #d94e55; --tone-dark: #bd3741; --wash: #fff6f4; --tint: #ffedeb;
+      position: absolute; z-index: 1; top: 426px; left: 8px; width: 414px; height: 174px;
+      padding: 18px 70px 56px 22px; overflow: hidden; border: 1px solid rgba(255,255,255,.98); border-radius: 23px;
+      background: linear-gradient(128deg,#fff 0%,var(--wash) 70%,var(--tint) 150%);
+      box-shadow: 0 10px 24px rgba(57,92,116,.075), inset 0 1px 0 rgba(255,255,255,.92);
+    }
+    .batch-card:before { content:""; position:absolute; inset:0 auto 0 0; width:4px; background:linear-gradient(180deg,var(--tone),rgba(255,255,255,.3)); }
+    .batch-card.priority { --tone:#e6811c; --tone-dark:#bf650d; --wash:#fff9f0; --tint:#fff0d9; }
+    .batch-card.normal { --tone:#1e9a7c; --tone-dark:#117d68; --wash:#f6fcfa; --tint:#e7f7f2; }
+    .batch-line { display:flex; align-items:center; white-space:nowrap; }
+    .batch-id-line { height:28px; gap:9px; }
+    .batch-label { color:#8292a9; font-size:14px; font-weight:570; }
+    .batch-id { color:#142543; font-size:19px; line-height:26px; font-weight:770; letter-spacing:.15px; }
+    .detail-line { height:24px; margin-top:8px; gap:10px; }
+    .detail-label { color:#8392a9; font-size:14px; }
+    .detail-value { color:#182a46; font-size:16px; font-weight:660; letter-spacing:.1px; }
+    .expiry-note { margin-left:auto; color:var(--tone-dark); font-size:13px; font-weight:750; }
+    .stock-line { margin-top:7px; }
+    .stock-line .detail-value { color:#176ab8; font-size:18px; font-weight:780; }
+    .location { margin-left:2px; color:#7587a3; font-size:14px; }
+    .status-chip { position:absolute; right:48px; bottom:13px; min-width:80px; height:31px; padding:4px 12px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid rgba(255,255,255,.82); border-radius:999px; background:linear-gradient(135deg,rgba(255,255,255,.96),var(--tint)); color:var(--tone-dark); font-size:14px; font-weight:780; box-shadow:0 3px 9px rgba(50,68,87,.055); }
+    .status-mark { display:grid; place-items:center; width:14px; height:14px; border-radius:50%; background:var(--tone); color:white; font-size:10px; line-height:14px; font-weight:850; }
+    .arrow-button { position:absolute; top:54px; right:10px; width:42px; height:42px; padding:0; display:grid; place-items:center; border:1px solid rgba(105,133,156,.08); border-radius:50%; background:rgba(255,255,255,.9); color:#667d99; cursor:pointer; }
+    .arrow-button svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.15; stroke-linecap:round; stroke-linejoin:round; }
+    .arrow-button:focus-visible { outline:3px solid #248da0; outline-offset:2px; }
+    .batch-card.expanded { height:335px; padding:12px 12px 10px; }
+    .expanded-head { height:32px; padding:0 44px 5px 5px; display:flex; align-items:center; color:#142542; font-size:15px; line-height:23px; font-weight:760; white-space:nowrap; }
+    .expanded-head small { margin-left:auto; color:#7a8ba4; font-size:12px; line-height:18px; font-weight:550; }
+    .expanded-head .arrow-button { top:7px; right:8px; width:32px; height:32px; border:0; background:transparent; }
+    .batch-row { --row-tone:#d94e55; --row-dark:#bd3741; --row-tint:#ffebe9; position:relative; height:77px; margin-top:6px; padding:8px 11px 6px 14px; border:1px solid rgba(118,148,166,.12); border-radius:15px; background:linear-gradient(115deg,#fff,#fbfdfd); }
+    .batch-row:before { content:""; position:absolute; top:9px; bottom:9px; left:0; width:3px; border-radius:0 3px 3px 0; background:var(--row-tone); }
+    .batch-row.priority { --row-tone:#e6811c; --row-dark:#bf650d; --row-tint:#fff0d9; }
+    .batch-row.normal { --row-tone:#1e9a7c; --row-dark:#117d68; --row-tint:#e4f6f0; }
+    .row-first,.row-second,.row-third { display:flex; align-items:center; white-space:nowrap; }
+    .row-first { height:21px; }
+    .row-id { color:#182a46; font-size:15px; line-height:20px; font-weight:760; }
+    .row-chip { margin-left:auto; padding:3px 9px; border-radius:999px; background:var(--row-tint); color:var(--row-dark); font-size:11px; line-height:16px; font-weight:760; }
+    .row-second { height:18px; margin-top:2px; gap:8px; color:#7989a2; font-size:12px; }
+    .row-date { color:#273a56; font-size:13px; font-weight:670; }
+    .row-note { margin-left:auto; color:var(--row-dark); font-size:11px; font-weight:720; }
+    .row-third { height:18px; margin-top:1px; color:#7889a2; font-size:11px; }
+    .row-quantity { color:#176ab8; font-size:13px; font-weight:770; }
+    .row-location { margin-left:9px; }
+    .expanded-total { height:22px; padding:6px 4px 0; display:flex; justify-content:flex-end; color:#70829b; font-size:12px; }
+    .expanded-total strong { margin-left:6px; color:#127e6a; font-size:13px; }
+    .flow-heading { position:absolute; top:624px; left:10px; right:12px; height:30px; display:flex; align-items:center; justify-content:space-between; color:#111827; font-size:20px; line-height:28px; font-weight:770; }
+    .flow-heading span:last-child { display:flex; align-items:center; gap:5px; color:#71839f; font-size:14px; font-weight:570; }
+    .flow-heading svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .flow-card { position:absolute; top:661px; left:0; width:430px; height:151px; padding:2px 15px; border:1px solid rgba(255,255,255,.96); border-radius:22px 22px 0 0; background:linear-gradient(150deg,rgba(255,255,255,.97),rgba(255,255,255,.91)); box-shadow:0 8px 22px rgba(67,99,117,.05); }
+    .flow-row { height:72px; display:flex; align-items:center; border-bottom:1px solid #edf1f4; }
+    .flow-row:last-child { border-bottom:0; }
+    .flow-icon { width:43px; height:43px; margin-right:14px; display:grid; place-items:center; border-radius:15px; background:#e6f7f2; color:#169779; }
+    .flow-icon.blue { background:#e9f2ff; color:#2674d2; }
+    .flow-icon svg { width:23px; height:23px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .flow-copy { display:flex; flex-direction:column; gap:3px; }
+    .flow-name { color:#182741; font-size:16px; line-height:21px; font-weight:720; }
+    .flow-date { color:#7c8da8; font-size:14px; line-height:18px; }
+    .flow-amount { margin-left:auto; color:#127e6a; font-size:17px; font-weight:760; }
+    .flow-row:nth-child(2) .flow-amount { color:#17253c; }
+    .bottom-nav { position:absolute; z-index:4; left:0; right:0; bottom:0; height:86px; padding:9px 14px 7px; display:grid; grid-template-columns:repeat(4,1fr); border:1px solid rgba(255,255,255,.94); border-bottom:0; border-radius:21px 21px 0 0; background:rgba(255,255,255,.9); box-shadow:0 -5px 18px rgba(77,107,124,.065); }
+    .nav-item { display:flex; flex-direction:column; align-items:center; gap:3px; color:#7688a5; font-size:13px; line-height:18px; font-weight:570; }
+    .nav-item svg { width:25px; height:26px; fill:none; stroke:currentColor; stroke-width:1.85; stroke-linecap:round; stroke-linejoin:round; }
+    .nav-item.active { color:#158c88; font-weight:760; }
+    .nav-item.active svg { fill:rgba(21,140,136,.1); stroke-width:2.15; }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+  <main class="screen" id="screen">
+    <i class="leaf leaf-a"></i><i class="leaf leaf-b"></i><i class="leaf leaf-c"></i>
+    <div class="statusbar" aria-label="状态栏">
+      <span>9:41</span><span class="island"></span>
+      <div class="status-icons" aria-hidden="true">
+        <svg viewBox="0 0 22 17" width="22"><path d="M1 16V12h3v4zm5 0V9h3v7zm5 0V6h3v10zm5 0V2h3v14z"/></svg>
+        <svg viewBox="0 0 19 17" width="19"><path d="M1 5.5 9.5 14 18 5.5C13.2.9 5.8.9 1 5.5Z"/></svg>
+        <svg viewBox="0 0 29 17" width="29"><path d="M2 2h21a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm25 3h2v7h-2zM3 4v9h19V4z"/></svg>
+      </div>
+    </div>
+    <header class="toolbar">
+      <div class="back" aria-label="返回"><svg viewBox="0 0 24 24"><path d="M19 12H5m7 7-7-7 7-7"/></svg></div>
+      <h1 class="page-title">库存详情</h1><div></div>
+    </header>
+    <section class="hero" aria-label="商品信息">
+      <div class="product-tile">
+        <svg viewBox="0 0 86 124" role="img" aria-label="鲜牛奶纸盒示意图">
+          <defs>
+            <linearGradient id="carton" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff"/><stop offset=".65" stop-color="#f7fbff"/><stop offset="1" stop-color="#dfeaf2"/></linearGradient>
+            <linearGradient id="bluePanel" x1="0" x2="1"><stop stop-color="#0b68c9"/><stop offset="1" stop-color="#33a0f0"/></linearGradient>
+            <linearGradient id="milk" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#8ed8f5"/><stop offset="1" stop-color="#e4f7ff"/></linearGradient>
+          </defs>
+          <ellipse cx="45" cy="117" rx="25" ry="4" fill="#c6d6e0" opacity=".48"/>
+          <path d="M25 17 44 6l22 9-2 95-39 3z" fill="url(#carton)" stroke="#d4e1e9" stroke-width="1.2"/>
+          <path d="m25 17 19-11 1 13-20 11z" fill="#ecf7fc" stroke="#d4e1e9" stroke-width="1"/>
+          <path d="m44 6 22 9-20 11-21-9z" fill="#fff" stroke="#d4e1e9" stroke-width="1"/>
+          <path d="m48 26 18-11-2 95-17 5z" fill="#eef6fa" stroke="#d4e1e9" stroke-width=".8"/>
+          <path d="M29 33 47 23l-.5 60-18 9z" fill="url(#bluePanel)"/>
+          <path d="m29 92 18-9v12l-18 9z" fill="#fff" opacity=".97"/>
+          <path d="M31 37 44 30" stroke="#bce7ff" stroke-width="2"/>
+          <text x="37" y="61" transform="rotate(-90 37 61)" fill="#fff" font-size="7" font-weight="700" font-family="sans-serif">鲜牛奶</text>
+          <text x="38" y="79" transform="rotate(-90 38 79)" fill="#eaf8ff" font-size="4.3" font-family="sans-serif">250 ml</text>
+          <path d="M49 96c6-8 11-8 16-2v13l-16 4z" fill="url(#milk)"/>
+          <path d="M50 99c4-4 8-5 14-2" fill="none" stroke="#48b6e2" stroke-width="1.5"/>
+          <path d="m21 20 7-4 2 5-7 5z" fill="#2386de"/>
+          <path d="M47 24v82" stroke="#d5e2e9" stroke-width=".8"/>
+        </svg>
+      </div>
+      <div class="product-copy">
+        <div class="product-name">鲜牛奶 250ml</div>
+        <div class="available"><span>可用</span><strong>24</strong><b>瓶</b></div>
+        <div class="location-line"><svg viewBox="0 0 24 24"><path d="M20 10.2c0 5.1-8 11.6-8 11.6S4 15.3 4 10.2a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>冷藏区 / A-02</span></div>
+      </div>
+    </section>
+    <nav class="actions" aria-label="库存操作">
+      <div class="action action-in"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4zM7 8V5h10v3M12 11v6m-3-3 3 3 3-3"/></svg><span>入库</span></div>
+      <div class="action action-out"><svg viewBox="0 0 24 24"><path d="M4 8h16v12H4zM7 8V5h10v3M12 17v-6m-3 3 3-3 3 3"/></svg><span>出库</span></div>
+      <div class="action action-move"><svg viewBox="0 0 24 24"><path d="M5 7h13m-3-3 3 3-3 3M19 17H6m3-3-3 3 3 3"/></svg><span>移库</span></div>
+    </nav>
+    <div class="section-heading"><span class="section-title">库存批次</span><span class="batch-count">共 3 批</span></div>
+    <section class="batch-card" id="batchCard" aria-label="库存批次卡片">
+      <div class="collapsed-content" id="collapsedContent">
+        <div class="batch-line batch-id-line"><span class="batch-label">批次</span><strong class="batch-id" id="batchId"></strong></div>
+        <div class="batch-line detail-line"><span class="detail-label">效期</span><strong class="detail-value" id="expiry"></strong><span class="expiry-note" id="expiryNote"></span></div>
+        <div class="batch-line detail-line stock-line"><span class="detail-label">可用</span><strong class="detail-value" id="quantity"></strong><span class="location">冷藏区 / A-02</span></div>
+        <div class="status-chip"><span class="status-mark" id="statusMark"></span><span id="statusLabel"></span></div>
+        <button class="arrow-button" id="expandButton" type="button" aria-label="展开全部库存批次" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+      </div>
+      <div class="expanded-content" id="expandedContent" hidden>
+        <div class="expanded-head"><span>批次明细</span><small>共 3 批 · 按优先级排序</small></div>
+        <div id="batchRows"></div>
+        <div class="expanded-total">合计可用 <strong>24 瓶</strong></div>
+        <button class="arrow-button" id="collapseButton" type="button" aria-label="收起库存批次" aria-expanded="true"><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>
+      </div>
+    </section>
+    <div class="flow-heading" id="flowHeading"><span>库存流水</span><span>查看全部<svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span></div>
+    <section class="flow-card" id="flowCard" aria-label="库存流水">
+      <div class="flow-row"><div class="flow-icon"><svg viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9H4zM12 17v-6m-3 3 3 3 3-3"/></svg></div><div class="flow-copy"><strong class="flow-name">入库</strong><span class="flow-date">2026-10-10 14:20</span></div><strong class="flow-amount">+24 瓶</strong></div>
+      <div class="flow-row"><div class="flow-icon blue"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM12 7v10m-4-4 4 4 4-4"/></svg></div><div class="flow-copy"><strong class="flow-name">补到货架</strong><span class="flow-date">2026-10-08 10:30</span></div><strong class="flow-amount">−6 瓶</strong></div>
+    </section>
+    <nav class="bottom-nav" aria-label="主导航">
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H5V10m5 10v-6h4v6"/></svg><span>工作台</span></div>
+      <div class="nav-item active"><svg viewBox="0 0 24 24"><path d="M5 5h14v15H5zM9 3h6v4H9zM8 13h8M8 16h8"/></svg><span>库存</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M4 19V9h4v10zm6 0V4h4v15zm6 0v-7h4v7z"/></svg><span>分析</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c.5-4.2 3.2-6.5 8-6.5s7.5 2.3 8 6.5z"/></svg><span>我的</span></div>
+    </nav>
+  </main>
+  <script>
+    const batches = [
+      { id: "B20261010", state: "near", status: "临期", expiry: "2026-10-15", note: "3 天后到期", quantity: "8 瓶", location: "冷藏区 / A-02" },
+      { id: "B20261022", state: "priority", status: "优先出库", expiry: "2026-11-02", note: "已标记优先出库", quantity: "6 瓶", location: "冷藏区 / A-02" },
+      { id: "B20261028", state: "normal", status: "正常", expiry: "2026-12-08", note: "距效期约 57 天", quantity: "10 瓶", location: "冷藏区 / A-02" }
+    ];
+    const examples = {
+      near: { id: "B20261010", state: "near", status: "临期", expiry: "2026-10-15", note: "3 天后到期", quantity: "8 瓶", marker: "!" },
+      priority: { id: "B20261022", state: "priority", status: "优先出库", expiry: "2026-11-02", note: "已标记优先出库", quantity: "6 瓶", marker: "↑" },
+      normal: { id: "B20261028", state: "normal", status: "正常", expiry: "2026-12-08", note: "距效期约 57 天", quantity: "10 瓶", marker: "✓" }
+    };
+    const requested = new URLSearchParams(location.search).get("state") || "near";
+    let state = examples[requested] ? requested : "near";
+    let expanded = requested === "expanded";
+    const card = document.getElementById("batchCard");
+    const collapsed = document.getElementById("collapsedContent");
+    const expandedContent = document.getElementById("expandedContent");
+    function renderRows() {
+      document.getElementById("batchRows").innerHTML = batches.map(batch => `<article class="batch-row ${batch.state}">
+        <div class="row-first"><strong class="row-id">${batch.id}</strong><span class="row-chip">${batch.status}</span></div>
+        <div class="row-second"><span>效期</span><strong class="row-date">${batch.expiry}</strong><span class="row-note">${batch.note}</span></div>
+        <div class="row-third"><strong class="row-quantity">可用 ${batch.quantity}</strong><span class="row-location">${batch.location}</span></div>
+      </article>`).join("");
+    }
+    function render() {
+      const sample = examples[state];
+      card.classList.remove("near", "priority", "normal", "expanded");
+      card.classList.add(sample.state);
+      if (expanded) card.classList.add("expanded");
+      collapsed.hidden = expanded;
+      expandedContent.hidden = !expanded;
+      document.getElementById("batchId").textContent = sample.id;
+      document.getElementById("expiry").textContent = sample.expiry;
+      document.getElementById("expiryNote").textContent = sample.note;
+      document.getElementById("quantity").textContent = sample.quantity;
+      document.getElementById("statusMark").textContent = sample.marker;
+      document.getElementById("statusLabel").textContent = sample.status;
+      document.getElementById("flowHeading").style.top = expanded ? "785px" : "624px";
+      document.getElementById("flowCard").style.top = expanded ? "822px" : "661px";
+      document.getElementById("expandButton").setAttribute("aria-expanded", String(expanded));
+      renderRows();
+    }
+    document.getElementById("expandButton").addEventListener("click", () => { expanded = true; render(); });
+    document.getElementById("collapseButton").addEventListener("click", () => { expanded = false; render(); });
+    render();
+  </script>
+</body>
+</html>

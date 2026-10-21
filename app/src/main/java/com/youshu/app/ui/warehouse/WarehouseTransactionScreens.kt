@@ -49,6 +49,10 @@ fun WarehouseTransactionHomeScreen(
     onPending: () -> Unit
 ) {
     val inbound = direction == EntryDirection.INBOUND
+    if (inbound) {
+        WarehouseReceiveHomeScreen(state, onBack, onSource, onPending)
+        return
+    }
     LazyColumn(Modifier.fillMaxSize().background(WarehousePalette.Background), contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { WarehouseHeader(if (inbound) "收货入库" else "出库作业", onBack) }

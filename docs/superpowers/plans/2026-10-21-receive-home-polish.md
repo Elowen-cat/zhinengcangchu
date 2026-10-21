@@ -1,6 +1,6 @@
 # Receive home polish Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:plan-execution to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:plan-execution to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Rebuild the inbound landing screen to match the supplied reference, publish both UI changes to GitHub, and update the emulator APK.
 
@@ -17,17 +17,27 @@
 - Create: `app/src/main/java/com/youshu/app/ui/warehouse/WarehouseReceiveHomeScreen.kt`
 - Create: `app/src/main/java/com/youshu/app/ui/warehouse/WarehouseReceiveIcons.kt`
 
-- [ ] Route inbound landing content to the new screen while retaining the current callbacks.
-- [ ] Build a rounded mint warehouse banner with store icon, current workspace label, manual review explanation and preview marker where applicable.
-- [ ] Build three evenly sized process steps with icons and arrows: 录入、核对、入库. Allow text to wrap and the page to scroll on smaller screens.
-- [ ] Build rounded green photo, blue voice and orange pending cards with large vector icons and clear chevrons. The badge always uses the actual inbound draft count; zero does not imply pending work.
-- [ ] Keep a quieter manual entry button, accessible touch targets, and preserve the input/review/confirmation flow. Avoid implying that adding a photo alone posts stock.
+- [x] Route inbound landing content to the new screen while retaining the current callbacks.
+- [x] Build a rounded mint warehouse banner with store icon, current workspace label, manual review explanation and preview marker where applicable.
+- [x] Build three evenly sized process steps with icons and arrows: 录入、核对、入库. Allow text to wrap and the page to scroll on smaller screens.
+- [x] Build rounded green photo, blue voice and orange pending cards with large vector icons and clear chevrons. The badge always uses the actual inbound draft count; zero does not imply pending work.
+- [x] Keep a quieter manual entry button, accessible touch targets, and preserve the input/review/confirmation flow. Avoid implying that adding a photo alone posts stock.
 
 ## Delivery
 
-- [ ] Build the debug APK using the existing demo configuration without printing the demo token. No public version bump or download-page replacement is required.
-- [ ] Install with replacement on the current Android Studio emulator. Inspect the full page and each navigation entry; return without posting any stock operation. Save a screenshot and APK in a local sibling artifact folder.
-- [ ] Commit this change, fetch the remote main branch, and push the previous inventory-detail commit together with the new inbound change to the user-authorized repository. Verify remote main matches local HEAD.
-- [ ] Leave the inbound landing screen open and report build/install/push results accurately.
+- [x] Build the debug APK using the existing demo configuration without printing the demo token. No public version bump or download-page replacement is required.
+- [x] Install with replacement on the current Android Studio emulator. Inspect the full page and each navigation entry; return without posting any stock operation. Save a screenshot and APK in a local sibling artifact folder.
+- [x] Commit this change, fetch the remote main branch, and push the previous inventory-detail commit together with the new inbound change to the user-authorized repository. Verify remote main matches local HEAD.
+- [x] Leave the inbound landing screen open and report build/install/push results accurately.
 
 **Review:** As in the prior plan, the skill's local companion CLI is unavailable. Use an independent Codex agent review for this plan and implementation.
+
+## Completion evidence
+
+- Independent Codex review approved the plan and implementation.
+- Debug APK built successfully; no unit test run was added for this presentation change.
+- Emulator inspection covered all four entry routes: photo inbound, voice inbound, pending inbound and manual inbound, returning without confirming any stock operation.
+- Corrected transparent-surface shadow rendering after screenshot review; rebuilt and reinstalled the final APK.
+- Pending badge showed the actual zero inbound drafts. The final screenshot includes the complete page and manual entry button.
+- Artifacts are in sibling workspace folder 收货入库UI调整; emulator remains on the revised receive landing page.
+- AGENTS.md records the user's standing GitHub and emulator delivery instructions.

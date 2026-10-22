@@ -485,8 +485,14 @@ fun WarehousePendingScreen(
     onReview: (StockDraftUi) -> Unit,
     onDelete: (String) -> Unit,
     onConfirm: (EntryDirection, (String?) -> Unit) -> Unit,
-    onContinue: () -> Unit
+    onContinue: () -> Unit,
+    onReload: () -> Unit = {},
+    onReviewAll: (List<StockDraftUi>) -> Unit = {}
 ) {
+    if (direction == EntryDirection.INBOUND) {
+        WarehouseInboundPendingScreen(state, onBack, onEdit, onReview, onDelete, onConfirm, onContinue, onReload)
+        return
+    }
     val drafts = state.drafts.filter { it.direction == direction }
     val reviewed = drafts.count { it.reviewed }
     var deletingId by remember { mutableStateOf<String?>(null) }
@@ -503,7 +509,7 @@ fun WarehousePendingScreen(
                     color = WarehousePalette.Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
                 WarehouseAction(
                     if (state.previewMode) "模拟确认" + direction.label else "确认" + direction.label,
-                    { showConfirmation = true }, enabled = drafts.isNotEmpty() && reviewed == drafts.size && stockValid
+                    { showConfirmation = true }, enabled = drafts.isNotEmpty() && reviewed == drafts.size && stockValid && !state.pendingDraftWrite && state.persistenceError == null
                 )
             }
         }) { padding ->
@@ -514,7 +520,10 @@ fun WarehousePendingScreen(
             item {
                 Text("待确认 " + drafts.size + " 项 · 已核对 " + reviewed + " 项", color = WarehousePalette.Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 if (!stockValid) Text("出库数量超过批次库存，请修改草稿", color = WarehousePalette.Red)
-                state.persistenceError?.let { Text(it, color = WarehousePalette.Red) }
+                state.persistenceError?.let {
+                    Text(it, color = WarehousePalette.Red)
+                    TextButton(onClick = onReload, enabled = !state.pendingDraftWrite) { Text("重新加载草稿") }
+                }
                 resultMessage?.let { Text(it, color = if (it.contains("完成")) WarehousePalette.Teal else WarehousePalette.Red) }
             }
             if (drafts.isEmpty()) item { WarehouseEmpty("暂无待确认草稿", "继续录入后，逐项核对商品、数量、批次和库位。") }
@@ -525,13 +534,13 @@ fun WarehousePendingScreen(
                 else WarehouseCard {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(draft.reviewed, { checked -> onReview(draft.copy(reviewed = checked)) })
+                            Checkbox(draft.reviewed, { checked -> onReview(draft.copy(reviewed = checked)) }, enabled = !state.pendingDraftWrite)
                             Column(Modifier.weight(1f)) {
                                 Text(draft.productName, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = WarehousePalette.Navy)
                                 Text(draft.source.label + " · " + if (draft.reviewed) "已核对" else "待核对", color = WarehousePalette.Muted, fontSize = 12.sp)
                             }
-                            IconButton(onClick = { onEdit(draft.id) }) { Icon(Icons.Default.Edit, "编辑草稿") }
-                            IconButton(onClick = { deletingId = draft.id }) { Icon(Icons.Default.Delete, "删除草稿") }
+                            IconButton(onClick = { onEdit(draft.id) }, enabled = !state.pendingDraftWrite) { Icon(Icons.Default.Edit, "编辑草稿") }
+                            IconButton(onClick = { deletingId = draft.id }, enabled = !state.pendingDraftWrite) { Icon(Icons.Default.Delete, "删除草稿") }
                         }
                         Text("数量 " + draft.quantity + " " + draft.unit, fontWeight = FontWeight.Bold, color = WarehousePalette.Teal)
                         Text("批次 " + draft.batchCode, color = WarehousePalette.Navy, modifier = Modifier.padding(top = 8.dp))
@@ -547,7 +556,7 @@ fun WarehousePendingScreen(
                 }
             }
             if (drafts.isNotEmpty()) item {
-                TextButton(onClick = { drafts.forEach { onReview(it.copy(reviewed = reviewed != drafts.size)) } }) {
+                TextButton(onClick = { onReviewAll(drafts.map { it.copy(reviewed = reviewed != drafts.size) }) }, enabled = !state.pendingDraftWrite) {
                     Text(if (reviewed == drafts.size) "取消全部核对" else "全部标记已核对")
                 }
             }

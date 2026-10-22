@@ -10,7 +10,9 @@ import com.youshu.app.data.local.entity.WarehouseDocumentEntity
 import com.youshu.app.data.repository.WarehouseRepository
 import com.youshu.app.data.repository.WarehouseValidationException
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -101,6 +103,7 @@ data class WarehouseMovementUi(
 class WarehouseUiState {
     var previewMode by mutableStateOf(false)
     var persistenceError by mutableStateOf<String?>(null)
+    var pendingDraftWrite by mutableStateOf(false)
     val products = mutableStateListOf<WarehouseProductUi>()
     val drafts = mutableStateListOf<StockDraftUi>()
     val movements = mutableStateListOf<WarehouseMovementUi>()
@@ -245,63 +248,163 @@ class WarehouseUiViewModel @Inject constructor(private val repository: Warehouse
     fun saveDraft(draft: StockDraftUi, done: (String?) -> Unit) = saveDrafts(listOf(draft), done)
 
     fun saveDrafts(drafts: List<StockDraftUi>, done: (String?) -> Unit) {
+        if (state.pendingDraftWrite) {
+            done("正在同步草稿，请稍后重试")
+            return
+        }
         if (drafts.isEmpty() || drafts.map { it.id }.distinct().size != drafts.size) {
             done("请核对待保存的草稿")
             return
         }
         if (state.previewMode) {
             drafts.forEach(state::save)
+            state.persistenceError = null
             done(null)
             return
         }
+        state.pendingDraftWrite = true
         viewModelScope.launch {
+            var failure: String? = null
             try {
                 repository.savePendingBatch(drafts.map { it.toEntity() })
-                done(null)
+                drafts.forEach(state::save)
+                state.persistenceError = null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                done(e.message ?: "草稿保存失败")
+                failure = e.message ?: "草稿保存失败"
+                state.persistenceError = failure
+            } finally {
+                state.pendingDraftWrite = false
             }
+            done(failure)
         }
     }
 
-    fun reviewDraft(draft: StockDraftUi) {
-        state.save(draft)
-        if (!state.previewMode) viewModelScope.launch {
+    fun reviewDraft(draft: StockDraftUi) = reviewDrafts(listOf(draft))
+
+    /** Review changes are one transaction, including the legacy outbound mark-all action. */
+    fun reviewDrafts(drafts: List<StockDraftUi>) {
+        if (state.pendingDraftWrite) return
+        if (drafts.isEmpty() || drafts.any { it.id.isBlank() } || drafts.map { it.id }.distinct().size != drafts.size) {
+            state.persistenceError = "请核对要更新核对状态的草稿"
+            return
+        }
+        val currentById = state.drafts.associateBy { it.id }
+        if (drafts.any { it.id !in currentById }) {
+            state.persistenceError = "草稿列表已变化，请重新加载后再核对"
+            return
+        }
+        // Use current fields and copy only the requested review flag from a potentially stale UI row.
+        val reviewed = drafts.map { currentById.getValue(it.id).copy(reviewed = it.reviewed) }
+        if (state.previewMode) {
+            reviewed.forEach(state::save)
+            state.persistenceError = null
+            return
+        }
+        state.pendingDraftWrite = true
+        viewModelScope.launch {
             try {
-                repository.savePending(draft.toEntity())
+                repository.savePendingBatch(reviewed.map { it.toEntity() })
+                reviewed.forEach(state::save)
                 state.persistenceError = null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 state.persistenceError = e.message ?: "核对状态保存失败"
+            } finally {
+                state.pendingDraftWrite = false
             }
         }
     }
 
     fun deleteDraft(id: String) {
-        state.drafts.removeAll { it.id == id }
-        if (!state.previewMode) viewModelScope.launch {
+        if (state.pendingDraftWrite) return
+        if (state.previewMode) {
+            state.drafts.removeAll { it.id == id }
+            state.persistenceError = null
+            return
+        }
+        state.pendingDraftWrite = true
+        viewModelScope.launch {
             try {
                 repository.deletePending(id)
+                state.drafts.removeAll { it.id == id }
                 state.persistenceError = null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 state.persistenceError = e.message ?: "删除草稿失败"
+            } finally {
+                state.pendingDraftWrite = false
+            }
+        }
+    }
+
+    /** Reload a persisted snapshot before allowing a failed pending operation to be confirmed. */
+    fun reloadPendingDrafts() {
+        if (state.pendingDraftWrite) return
+        if (state.previewMode) {
+            state.persistenceError = null
+            return
+        }
+        state.pendingDraftWrite = true
+        viewModelScope.launch {
+            try {
+                val persisted = repository.observePendingDocuments().first().map { it.toUi() }
+                state.drafts.clear()
+                state.drafts.addAll(persisted)
+                state.persistenceError = null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                state.persistenceError = e.message ?: "草稿重新加载失败，请重试"
+            } finally {
+                state.pendingDraftWrite = false
             }
         }
     }
 
     fun confirm(direction: EntryDirection, done: (String?) -> Unit) {
+        if (state.pendingDraftWrite) {
+            done("草稿正在同步，请稍后再确认")
+            return
+        }
+        if (state.persistenceError != null) {
+            done("草稿同步失败，请先重新加载草稿后再确认")
+            return
+        }
         if (state.previewMode) {
             done(state.simulateConfirmation(direction))
             return
         }
+        state.pendingDraftWrite = true
         viewModelScope.launch {
+            var failure: String? = null
+            var posted = false
             try {
                 repository.confirm(direction.name)
-                done(null)
+                posted = true
+                // Keep confirmation blocked until the visible queue reflects the committed result.
+                val persisted = repository.observePendingDocuments().first().map { it.toUi() }
+                state.drafts.clear()
+                state.drafts.addAll(persisted)
+                state.persistenceError = null
+            } catch (e: CancellationException) {
+                if (posted) state.persistenceError = "记账已提交，草稿列表同步中断，请重新加载草稿核对结果，勿重复提交"
+                throw e
             } catch (e: WarehouseValidationException) {
-                done(e.message ?: "请核对单据")
+                failure = if (posted) "记账已提交，但草稿列表同步失败，请重新加载草稿核对结果，勿重复提交"
+                    else e.message ?: "请核对单据"
+                if (posted) state.persistenceError = failure
             } catch (e: Exception) {
-                done("记账失败，请稍后重试")
+                failure = if (posted) "记账已提交，但草稿列表同步失败，请重新加载草稿核对结果，勿重复提交"
+                    else "确认记账遇到异常，请先重新加载草稿核对结果后再操作"
+                state.persistenceError = failure
+            } finally {
+                state.pendingDraftWrite = false
             }
+            done(failure)
         }
     }
 

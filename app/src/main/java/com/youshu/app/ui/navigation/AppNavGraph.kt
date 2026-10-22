@@ -47,12 +47,14 @@ private val tabs = listOf(
 )
 
 @Composable
-fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceiveLine> = emptyList()) {
+fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceiveLine> = emptyList(),
+    pendingPreviewDrafts: List<StockDraftUi> = emptyList()) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val holder: WarehouseUiViewModel = hiltViewModel()
     val state = holder.state
     var photoSamplesConsumed by rememberSaveable { mutableStateOf(false) }
+    var pendingSamplesConsumed by rememberSaveable { mutableStateOf(false) }
     val backStack by navController.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     val showBar = route == Screen.WarehouseWorkbench.route || route == Screen.WarehouseInventory.route ||
@@ -84,8 +86,12 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
     }
     LaunchedEffect(uiPreview) {
         if (uiPreview) {
-            state.enablePreview()
-            if (photoPreviewLines.isNotEmpty() && !photoSamplesConsumed) openEntry(EntryDirection.INBOUND, EntrySource.PHOTO)
+            if (!state.previewMode) state.enablePreview()
+            if (pendingPreviewDrafts.isNotEmpty() && !pendingSamplesConsumed) {
+                pendingPreviewDrafts.forEach(state::save)
+                pendingSamplesConsumed = true
+                navController.navigate(Screen.WarehousePending.createRoute(EntryDirection.INBOUND.name))
+            } else if (photoPreviewLines.isNotEmpty() && !photoSamplesConsumed) openEntry(EntryDirection.INBOUND, EntrySource.PHOTO)
         }
     }
     Scaffold(
@@ -197,7 +203,8 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
                     onReview = holder::reviewDraft,
                     onDelete = holder::deleteDraft,
                     onConfirm = holder::confirm,
-                    onContinue = { openEntry(direction, EntrySource.MANUAL) })
+                    onContinue = { navController.navigate(if (direction == EntryDirection.INBOUND) Screen.WarehouseReceive.route else Screen.WarehouseOutbound.route) },
+                    onReload = holder::reloadPendingDrafts, onReviewAll = holder::reviewDrafts)
             }
             composable(Screen.WarehouseTransfer.route, arguments = listOf(navArgument("productId") { type = NavType.StringType })) { entry ->
                 WarehouseTransferScreen(state.product(entry.arguments?.getString("productId")), back, state.previewMode,

@@ -92,4 +92,37 @@ class WarehousePreviewSimulationTest {
         state.enablePreview()
         assertEquals(original, state.movements.toList())
     }
+
+    @Test fun mixedSourcesRemainPendingTogetherUntilEveryInboundRowIsReviewed() {
+        val state = WarehouseUiState().apply { enablePreview() }
+        val originalMovements = state.movements.toList()
+        val photo = draft(EntryDirection.INBOUND, 5, reviewed = false).copy(source = EntrySource.PHOTO)
+        val voice = draft(EntryDirection.INBOUND, 3).copy(source = EntrySource.VOICE, transcript = "鲜牛奶三瓶")
+        val outbound = draft(EntryDirection.OUTBOUND, 2)
+        listOf(photo, voice, outbound).forEach(state::save)
+
+        assertEquals(2, state.drafts.count { it.direction == EntryDirection.INBOUND })
+        assertNotNull(state.simulateConfirmation(EntryDirection.INBOUND))
+        assertEquals(24, state.product("milk")?.availableQuantity)
+        assertEquals(originalMovements, state.movements.toList())
+
+        state.save(photo.copy(reviewed = true))
+        assertNull(state.simulateConfirmation(EntryDirection.INBOUND))
+        assertEquals(32, state.product("milk")?.availableQuantity)
+        assertEquals(listOf(outbound), state.drafts.toList())
+        assertEquals(2, state.movements.size - originalMovements.size)
+        assertEquals(setOf(3, 5), state.movements.take(2).map { it.quantity }.toSet())
+    }
+
+    @Test fun editedVoiceDraftKeepsSourceAndIdentityButMustBeReviewedAgain() {
+        val state = WarehouseUiState().apply { enablePreview() }
+        val voice = draft(EntryDirection.INBOUND, 3).copy(source = EntrySource.VOICE, transcript = "鲜牛奶三瓶")
+        state.save(voice)
+        state.save(voice.copy(quantity = 4, reviewed = false))
+        assertEquals(1, state.drafts.size)
+        assertEquals(EntrySource.VOICE, state.drafts.single().source)
+        assertEquals("鲜牛奶三瓶", state.drafts.single().transcript)
+        assertNotNull(state.simulateConfirmation(EntryDirection.INBOUND))
+        assertEquals(24, state.product("milk")?.availableQuantity)
+    }
 }

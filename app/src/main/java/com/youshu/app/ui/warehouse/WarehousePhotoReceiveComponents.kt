@@ -206,34 +206,3 @@ private fun PhotoInput(label: String, value: String, enabled: Boolean, modifier:
             unfocusedBorderColor = if (warning) Color(0xFFFFD28A) else WarehousePalette.Border,
             unfocusedLabelColor = if (warning) WarehousePalette.Orange else WarehousePalette.Muted))
 }
-
-@Composable
-internal fun InboundPendingCard(draft: StockDraftUi, onReview: (Boolean) -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Surface(color = Color.White, shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, WarehousePalette.Border)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (draft.imageUris.isNotEmpty()) AsyncImage(draft.imageUris.first(), "商品照片", Modifier.size(65.dp)
-                    .clip(RoundedCornerShape(14.dp)).background(WarehousePalette.Background), contentScale = ContentScale.Crop)
-                else ProductThumb()
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    StatusTag(if (draft.reviewed) "已核对" else "待人工核对", if (draft.reviewed) WarehousePalette.Teal else WarehousePalette.Orange)
-                    Text(draft.productName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = WarehousePalette.Navy,
-                        modifier = Modifier.padding(top = 5.dp))
-                }
-                IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "编辑草稿 ${draft.productName}", tint = WarehousePalette.Muted) }
-            }
-            Text("数量  ${draft.quantity} ${draft.unit}", color = WarehousePalette.Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("批次  ${draft.batchCode}", color = WarehousePalette.Navy, fontSize = 14.sp)
-            Text("效期  ${draft.expiry.ifBlank { "未设置" }}", color = WarehousePalette.Muted, fontSize = 13.sp)
-            Text("库位  ${draft.location}", color = WarehousePalette.Muted, fontSize = 13.sp)
-            if (draft.supplier.isNotBlank()) Text("供应商  ${draft.supplier}", color = WarehousePalette.Muted, fontSize = 12.sp)
-            if (draft.purchasePrice.isNotBlank()) Text("单件进价  ¥${draft.purchasePrice} / ${draft.unit}", color = WarehousePalette.Muted, fontSize = 12.sp)
-            HorizontalDivider(color = WarehousePalette.Border.copy(alpha = 0.6f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(draft.reviewed, onCheckedChange = onReview)
-                Text("已核对商品、数量、批次和库位", color = WarehousePalette.Navy, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, "删除草稿 ${draft.productName}", tint = WarehousePalette.Muted) }
-            }
-        }
-    }
-}

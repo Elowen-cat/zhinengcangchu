@@ -15,6 +15,7 @@ class WarehouseUiPreviewActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val samples = if (intent.getBooleanExtra("photo_preview", false)) photoReceivePreviewSamples(packageName) else emptyList()
-        setContent { YouShuTheme { AppNavGraph(uiPreview = true, photoPreviewLines = samples) } }
+        val pending = if (intent.getBooleanExtra("pending_preview", false)) pendingInboundPreviewSamples(packageName) else emptyList()
+        setContent { YouShuTheme { AppNavGraph(uiPreview = true, photoPreviewLines = samples, pendingPreviewDrafts = pending) } }
     }
 }

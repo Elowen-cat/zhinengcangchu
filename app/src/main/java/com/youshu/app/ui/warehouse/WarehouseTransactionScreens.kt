@@ -519,7 +519,10 @@ fun WarehousePendingScreen(
             }
             if (drafts.isEmpty()) item { WarehouseEmpty("暂无待确认草稿", "继续录入后，逐项核对商品、数量、批次和库位。") }
             items(drafts, key = { it.id }) { draft ->
-                WarehouseCard {
+                if (direction == EntryDirection.INBOUND) InboundPendingCard(draft,
+                    onReview = { onReview(draft.copy(reviewed = it)) },
+                    onEdit = { onEdit(draft.id) }, onDelete = { deletingId = draft.id })
+                else WarehouseCard {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(draft.reviewed, { checked -> onReview(draft.copy(reviewed = checked)) })

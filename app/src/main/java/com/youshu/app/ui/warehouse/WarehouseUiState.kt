@@ -242,15 +242,21 @@ class WarehouseUiViewModel @Inject constructor(private val repository: Warehouse
         }
     }
 
-    fun saveDraft(draft: StockDraftUi, done: (String?) -> Unit) {
+    fun saveDraft(draft: StockDraftUi, done: (String?) -> Unit) = saveDrafts(listOf(draft), done)
+
+    fun saveDrafts(drafts: List<StockDraftUi>, done: (String?) -> Unit) {
+        if (drafts.isEmpty() || drafts.map { it.id }.distinct().size != drafts.size) {
+            done("请核对待保存的草稿")
+            return
+        }
         if (state.previewMode) {
-            state.save(draft)
+            drafts.forEach(state::save)
             done(null)
             return
         }
         viewModelScope.launch {
             try {
-                repository.savePending(draft.toEntity())
+                repository.savePendingBatch(drafts.map { it.toEntity() })
                 done(null)
             } catch (e: Exception) {
                 done(e.message ?: "草稿保存失败")

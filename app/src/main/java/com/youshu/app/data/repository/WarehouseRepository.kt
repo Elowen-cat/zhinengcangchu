@@ -58,12 +58,19 @@ class WarehouseRepository @Inject constructor(
         }
     }
 
-    suspend fun savePending(document: WarehouseDocumentEntity) {
-        require(document.status == "PENDING")
+    suspend fun savePending(document: WarehouseDocumentEntity) = savePendingBatch(listOf(document))
+
+    /** A photo session is saved all-or-nothing; this does not post any stock movement. */
+    suspend fun savePendingBatch(documents: List<WarehouseDocumentEntity>) {
+        require(documents.isNotEmpty()) { "没有待保存草稿" }
+        require(documents.all { it.status == "PENDING" })
+        require(documents.map { it.id }.distinct().size == documents.size) { "草稿编号重复" }
         database.withTransaction {
-            val old = dao.document(document.id)
-            if (old != null && old.status != "PENDING") throw WarehouseValidationException("已确认单据不可修改")
-            dao.upsertDocument(document.copy(createdAt = old?.createdAt ?: document.createdAt))
+            documents.forEach { document ->
+                val old = dao.document(document.id)
+                if (old != null && old.status != "PENDING") throw WarehouseValidationException("已确认单据不可修改")
+                dao.upsertDocument(document.copy(createdAt = old?.createdAt ?: document.createdAt))
+            }
         }
     }
 

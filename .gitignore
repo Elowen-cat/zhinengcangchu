@@ -45,6 +45,7 @@ UI草图.png
 /competition-worker/.env.*
 /competition-worker/.demo-access-token
 /competition-worker/.demo-access-token.dpapi
+/tencent-scf/.demo-access-token*
 
 # Public download page packages are generated from the Android build.
 /download-site/public/*.apk

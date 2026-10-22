@@ -14,6 +14,7 @@ class WarehouseUiPreviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { YouShuTheme { AppNavGraph(uiPreview = true) } }
+        val samples = if (intent.getBooleanExtra("photo_preview", false)) photoReceivePreviewSamples(packageName) else emptyList()
+        setContent { YouShuTheme { AppNavGraph(uiPreview = true, photoPreviewLines = samples) } }
     }
 }

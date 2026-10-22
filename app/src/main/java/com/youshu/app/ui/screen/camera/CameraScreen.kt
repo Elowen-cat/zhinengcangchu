@@ -87,6 +87,9 @@ fun CameraScreen(
     onBack: () -> Unit,
     onDisposed: () -> Unit = {},
     onSkipPhoto: () -> Unit = {},
+    actionColorStart: Color = PurpleStart,
+    actionColorEnd: Color = PurpleEnd,
+    confirmationLabel: String = "下一步",
     onPhotoTaken: (List<Uri>) -> Unit
 ) {
     val context = LocalContext.current
@@ -448,6 +451,7 @@ fun CameraScreen(
                     ShutterButton(
                         iconRotation = targetRotation.toIconRotationDegrees(),
                         enabled = imageCapture != null && !isTakingPhoto,
+                        startColor = actionColorStart, endColor = actionColorEnd,
                         onClick = {
                             if (isTakingPhoto) return@ShutterButton
                             isTakingPhoto = true
@@ -472,7 +476,7 @@ fun CameraScreen(
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     if (capturedUris.isNotEmpty()) {
-                        NextButton(onClick = { onPhotoTaken(capturedUris.toList()) })
+                        NextButton(confirmationLabel, actionColorStart, onClick = { onPhotoTaken(capturedUris.toList()) })
                     }
                 }
             }
@@ -544,7 +548,7 @@ private fun GalleryButton(onClick: () -> Unit) {
     ) {
         Icon(
             imageVector = Icons.Default.PhotoLibrary,
-            contentDescription = "浠庡浘搴撻€夋嫨",
+            contentDescription = "从图库选择",
             tint = Color.White,
             modifier = Modifier.size(25.dp)
         )
@@ -555,6 +559,8 @@ private fun GalleryButton(onClick: () -> Unit) {
 private fun ShutterButton(
     iconRotation: Float,
     enabled: Boolean,
+    startColor: Color,
+    endColor: Color,
     onClick: () -> Unit
 ) {
     Box(
@@ -573,7 +579,7 @@ private fun ShutterButton(
                 .clip(CircleShape)
                 .background(
                     brush = Brush.linearGradient(
-                        colors = listOf(PurpleStart, PurpleEnd)
+                        colors = listOf(startColor, endColor)
                     )
                 ),
             contentAlignment = Alignment.Center
@@ -591,16 +597,16 @@ private fun ShutterButton(
 }
 
 @Composable
-private fun NextButton(onClick: () -> Unit) {
+private fun NextButton(label: String, color: Color, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(PurpleStart)
+            .background(color)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Text(
-            text = "下一步",
+            text = label,
             color = Color.White,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold

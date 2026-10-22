@@ -18,11 +18,13 @@
 - Create `app/src/main/java/com/youshu/app/ui/warehouse/WarehouseInboundPendingScreen.kt`.
 - Modify `app/src/main/java/com/youshu/app/ui/warehouse/WarehouseTransactionScreens.kt` to dispatch inbound to the new screen and preserve outbound behavior.
 - Remove the superseded `InboundPendingCard` in `WarehousePhotoReceiveComponents.kt`; relocate its replacement into the new screen file.
+- Modify `WarehouseUiState.kt` so formal review/delete mutate displayed drafts only after repository success, expose `pendingDraftWrite` during writes, and add `reloadPendingDrafts()` using the pending document flow's first snapshot as a visible retry action.
 
 - [ ] Build the reference-style warning banner, count summary (`待确认 N 项 · 已核对 M 项 · 还需核对 N-M 项`) and zero-safe review progress. Show preview labels explicitly. Empty queue must display an inviting empty state with continuation enabled, confirmation disabled.
 - [ ] Use each draft's immutable `EntrySource` to show `图片录入`/`语音录入`/`手动录入` with camera/microphone/edit icons. Use a photo thumbnail where supplied, otherwise a source-appropriate placeholder. Show quantity/unit, batch, optional expiry, location and optional supplier/price without fabricating missing data.
 - [ ] Put review checkbox at the card's upper right, a labeled edit button beside name/details, and an accessible overflow delete action. Unreviewed expiry is orange with a `请核对` indicator; reviewed expiry returns to normal, but past/invalid dates remain warned. All text must wrap on narrow screens.
 - [ ] Keep individual checkboxes, omit bulk mark-all to emphasize actual per-item review. Bottom bar has `继续录入` and disabled `全部核对后确认入库` until all reviewed. After review use `确认入库（N项）` (preview: `模拟确认入库（N项）`). Retain a final confirmation dialog and repository validation/error reporting. Disable mutation during submission and recheck eligibility before calling onConfirm. Continue goes to the receive home for photo/voice/manual choice.
+- [ ] Keep formal displayed and persisted pending drafts consistent: no optimistic removal/review; disable confirmation while `pendingDraftWrite` or `persistenceError` is set. Show a `重新加载草稿` retry action that reloads the persisted queue before clearing errors. Guard the ViewModel confirm method too. Deletion failure leaves the visible item and an error, and therefore cannot silently confirm a hidden row. Preview changes remain synchronous.
 
 ### Task 2: Preview and navigation
 
@@ -37,6 +39,7 @@
 
 - [ ] Run `scripts/build-warehouse-demo.ps1 -Tasks @(':app:assembleDebug', ':app:runDebugUnitTestsDirect')` using protected demo configuration, never print secrets. Existing user authorization covers full-flow verification.
 - [ ] Replace-install with `adb install -r` on emulator-5554. Check mixed source labels, initial 3/2/1 and progress, disabled confirm, each review toggle, edit preserving source/resetting reviewed, deletion counts, date warnings, empty state and continuation. Confirm isolated sample queue and inspect stock/movements; no formal data writes.
+- [ ] Review the explicit failure path (delete exception does not remove the visible row; error and busy flags block confirm), and record whether runtime failure injection was performed rather than claiming it if unavailable.
 - [ ] Capture final screenshots and save actual verification notes in `docs/pending-inbound-verification-2026-10-22.md`.
 - [ ] Commit the related files, fetch origin main, require main to be an ancestor, push HEAD:main and compare remote SHA. Copy final APK to a named artifact folder and reopen opt-in mixed preview for user viewing.
 

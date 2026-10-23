@@ -16,6 +16,8 @@ class WarehouseUiPreviewActivity : ComponentActivity() {
         enableEdgeToEdge()
         val samples = if (intent.getBooleanExtra("photo_preview", false)) photoReceivePreviewSamples(packageName) else emptyList()
         val pending = if (intent.getBooleanExtra("pending_preview", false)) pendingInboundPreviewSamples(packageName) else emptyList()
-        setContent { YouShuTheme { AppNavGraph(uiPreview = true, photoPreviewLines = samples, pendingPreviewDrafts = pending) } }
+        val outbound = if (intent.getBooleanExtra("outbound_preview", false)) pendingOutboundPreviewSamples(packageName) else emptyList()
+        setContent { YouShuTheme { AppNavGraph(uiPreview = true, photoPreviewLines = samples, pendingPreviewDrafts = pending,
+            outboundPreviewDrafts = outbound) } }
     }
 }

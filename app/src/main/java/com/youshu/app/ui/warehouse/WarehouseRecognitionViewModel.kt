@@ -53,13 +53,38 @@ class WarehouseRecognitionViewModel @Inject constructor(
     val transcriptState = _transcriptState.asStateFlow()
     private var photoJob: Job? = null
     private var transcriptJob: Job? = null
+    private var voiceJob: Job? = null
+    private var session = 0L
+    private var outboundItemId: String? = null
+
+    /** Keep requests alive across camera navigation and configuration recreation for the same item. */
+    fun ensureOutboundSession(itemId: String): Boolean {
+        if (outboundItemId == itemId) return false
+        resetSession()
+        outboundItemId = itemId
+        return true
+    }
+
+    /** A new outbound item must not consume results from its predecessor. */
+    fun resetSession() {
+        session++
+        photoJob?.cancel()
+        transcriptJob?.cancel()
+        voiceJob?.cancel()
+        _state.value = WarehouseRecognitionUiState()
+        _voiceState.value = WarehouseVoiceUiState()
+        _transcriptState.value = WarehouseTranscriptUiState()
+    }
 
     fun transcribeVoice(audioPath: String) {
         if (_voiceState.value.working) return
         _voiceState.value = WarehouseVoiceUiState(working = true)
-        viewModelScope.launch {
+        val requestSession = session
+        voiceJob = viewModelScope.launch {
+          try {
             aiInferenceRepository.transcribeSpeech(audioPath)
                 .onSuccess { text ->
+                    if (session != requestSession) return@onSuccess
                     _voiceState.value = WarehouseVoiceUiState(
                         transcript = text,
                         message = "语音已转成文字",
@@ -67,11 +92,12 @@ class WarehouseRecognitionViewModel @Inject constructor(
                     )
                 }
                 .onFailure { failure ->
+                    if (session != requestSession || failure is CancellationException) return@onFailure
                     _voiceState.value = WarehouseVoiceUiState(
                         message = failure.message ?: "语音识别失败，请再试一次"
                     )
                 }
-            runCatching { java.io.File(audioPath).delete() }
+          } finally { runCatching { java.io.File(audioPath).delete() } }
         }
     }
 
@@ -80,6 +106,7 @@ class WarehouseRecognitionViewModel @Inject constructor(
         if (_state.value.working && _state.value.sourcePhoto == first) return
         photoJob?.cancel()
         _state.value = WarehouseRecognitionUiState(sourcePhoto = first, working = true)
+        val requestSession = session
         photoJob = viewModelScope.launch {
             runCatching {
                 gateway.recognizePhotos(WarehousePhotoRecognitionRequest(
@@ -87,11 +114,12 @@ class WarehouseRecognitionViewModel @Inject constructor(
                     listOf(first)
                 ))
             }.onSuccess { fields ->
+                if (session != requestSession) return@onSuccess
                 _state.value = WarehouseRecognitionUiState(sourcePhoto = first, fields = fields,
                     message = if (fields.isEmpty) "没有识别到可靠字段，请手动填写" else "识别结果已自动填入，请核对表单",
                     resultId = UUID.randomUUID().toString())
             }.onFailure { error ->
-                if (error is CancellationException) return@onFailure
+                if (error is CancellationException || session != requestSession) return@onFailure
                 _state.value = WarehouseRecognitionUiState(sourcePhoto = first,
                     message = error.message ?: "识别失败，请手动填写")
             }
@@ -104,6 +132,7 @@ class WarehouseRecognitionViewModel @Inject constructor(
         if (_transcriptState.value.working && _transcriptState.value.sourceTranscript == text) return
         transcriptJob?.cancel()
         _transcriptState.value = WarehouseTranscriptUiState(sourceTranscript = text, working = true)
+        val requestSession = session
         transcriptJob = viewModelScope.launch {
             runCatching {
                 gateway.interpretTranscript(WarehouseTranscriptRecognitionRequest(
@@ -111,11 +140,12 @@ class WarehouseRecognitionViewModel @Inject constructor(
                     text
                 ))
             }.onSuccess { fields ->
+                if (session != requestSession) return@onSuccess
                 _transcriptState.value = WarehouseTranscriptUiState(sourceTranscript = text, fields = fields,
                     message = if (fields.isEmpty) "没有识别到可靠字段，请补充商品信息" else "识别结果已自动填入，请核对表单",
                     resultId = UUID.randomUUID().toString())
             }.onFailure { error ->
-                if (error is CancellationException) return@onFailure
+                if (error is CancellationException || session != requestSession) return@onFailure
                 val fallback = WarehouseVoiceDraftParser.parse(text)
                 val fields = WarehouseRecognitionFields(
                     productName = fallback.productName, quantity = fallback.quantity, unit = fallback.unit,

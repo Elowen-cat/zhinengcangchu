@@ -46,9 +46,14 @@ fun WarehouseTransactionHomeScreen(
     state: WarehouseUiState,
     onBack: () -> Unit,
     onSource: (EntrySource) -> Unit,
-    onPending: () -> Unit
+    onPending: () -> Unit,
+    onEdit: (String) -> Unit = { onPending() }
 ) {
     val inbound = direction == EntryDirection.INBOUND
+    if (!inbound) {
+        WarehouseOutboundHomeScreen(state, onBack, onSource, onPending, onEdit)
+        return
+    }
     if (inbound) {
         WarehouseReceiveHomeScreen(state, onBack, onSource, onPending)
         return
@@ -487,10 +492,16 @@ fun WarehousePendingScreen(
     onConfirm: (EntryDirection, (String?) -> Unit) -> Unit,
     onContinue: () -> Unit,
     onReload: () -> Unit = {},
-    onReviewAll: (List<StockDraftUi>) -> Unit = {}
+    onReviewAll: (List<StockDraftUi>) -> Unit = {},
+    onSaveDraft: (StockDraftUi, (String?) -> Unit) -> Unit = { _, done -> done("暂时无法保存草稿") }
 ) {
     if (direction == EntryDirection.INBOUND) {
         WarehouseInboundPendingScreen(state, onBack, onEdit, onReview, onDelete, onConfirm, onContinue, onReload)
+        return
+    }
+    if (direction == EntryDirection.OUTBOUND) {
+        WarehouseOutboundPendingScreen(state, onBack, onEdit, onReview, onDelete, onConfirm, onContinue,
+            onReload, onReviewAll, onSaveDraft)
         return
     }
     val drafts = state.drafts.filter { it.direction == direction }

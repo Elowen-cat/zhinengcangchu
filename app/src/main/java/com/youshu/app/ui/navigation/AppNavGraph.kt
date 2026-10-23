@@ -48,7 +48,7 @@ private val tabs = listOf(
 
 @Composable
 fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceiveLine> = emptyList(),
-    pendingPreviewDrafts: List<StockDraftUi> = emptyList()) {
+    pendingPreviewDrafts: List<StockDraftUi> = emptyList(), outboundPreviewDrafts: List<StockDraftUi> = emptyList()) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val holder: WarehouseUiViewModel = hiltViewModel()
@@ -87,7 +87,11 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
     LaunchedEffect(uiPreview) {
         if (uiPreview) {
             if (!state.previewMode) state.enablePreview()
-            if (pendingPreviewDrafts.isNotEmpty() && !pendingSamplesConsumed) {
+            if (outboundPreviewDrafts.isNotEmpty() && !pendingSamplesConsumed) {
+                outboundPreviewDrafts.forEach(state::save)
+                pendingSamplesConsumed = true
+                navController.navigate(Screen.WarehouseOutbound.route)
+            } else if (pendingPreviewDrafts.isNotEmpty() && !pendingSamplesConsumed) {
                 pendingPreviewDrafts.forEach(state::save)
                 pendingSamplesConsumed = true
                 navController.navigate(Screen.WarehousePending.createRoute(EntryDirection.INBOUND.name))
@@ -160,7 +164,8 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
                 composable(screen.route) {
                     WarehouseTransactionHomeScreen(direction, state, back,
                         onSource = { openEntry(direction, it) },
-                        onPending = { navController.navigate(Screen.WarehousePending.createRoute(direction.name)) })
+                        onPending = { navController.navigate(Screen.WarehousePending.createRoute(direction.name)) },
+                        onEdit = { id -> state.draft(id)?.let { openEntry(it.direction, it.source, it.productId, it.batchId, it.id) } })
                 }
             }
             composable(Screen.WarehouseEntry.route, arguments = listOf(
@@ -173,7 +178,7 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
                 val existing = state.draft(draftId)
                 val photoReceive = direction == EntryDirection.INBOUND && source == EntrySource.PHOTO
                 val photos by entry.savedStateHandle.getStateFlow(WAREHOUSE_PHOTOS,
-                    if (photoReceive) emptyList<String>() else existing?.imageUris.orEmpty()).collectAsState()
+                    if (photoReceive || direction == EntryDirection.OUTBOUND) emptyList<String>() else existing?.imageUris.orEmpty()).collectAsState()
                 val onSaved: () -> Unit = {
                     navController.navigate(Screen.WarehousePending.createRoute(direction.name)) {
                         popUpTo(Screen.WarehouseEntry.route) { inclusive = true }
@@ -187,6 +192,12 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
                     onSaveDrafts = holder::saveDrafts, onSaved = onSaved,
                     demoLines = if (uiPreview && !photoSamplesConsumed) photoPreviewLines else emptyList(),
                     onDemoConsumed = { photoSamplesConsumed = true }
+                ) else if (direction == EntryDirection.OUTBOUND) WarehouseOutboundEntryScreen(
+                    state, source, entry.arguments?.getString("product")?.takeIf { it.isNotBlank() },
+                    entry.arguments?.getString("batch")?.takeIf { it.isNotBlank() }, draftId, photos,
+                    onPhotosConsumed = { entry.savedStateHandle[WAREHOUSE_PHOTOS] = emptyList<String>() },
+                    onBack = back, onCamera = { navController.navigate(Screen.Camera.route) },
+                    onSaveDraft = holder::saveDraft, onSaved = onSaved
                 ) else WarehouseStockFormScreen(
                     state, direction, source,
                     entry.arguments?.getString("product")?.takeIf { it.isNotBlank() },
@@ -204,7 +215,8 @@ fun AppNavGraph(uiPreview: Boolean = false, photoPreviewLines: List<PhotoReceive
                     onDelete = holder::deleteDraft,
                     onConfirm = holder::confirm,
                     onContinue = { navController.navigate(if (direction == EntryDirection.INBOUND) Screen.WarehouseReceive.route else Screen.WarehouseOutbound.route) },
-                    onReload = holder::reloadPendingDrafts, onReviewAll = holder::reviewDrafts)
+                    onReload = holder::reloadPendingDrafts, onReviewAll = holder::reviewDrafts,
+                    onSaveDraft = holder::saveDraft)
             }
             composable(Screen.WarehouseTransfer.route, arguments = listOf(navArgument("productId") { type = NavType.StringType })) { entry ->
                 WarehouseTransferScreen(state.product(entry.arguments?.getString("productId")), back, state.previewMode,
